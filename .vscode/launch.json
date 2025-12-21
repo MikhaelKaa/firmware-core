@@ -1,0 +1,39 @@
+{
+	"version": "0.2.0",
+	"configurations": [	
+		{
+			"name": "cmsis-dap",
+			"cwd": "${workspaceRoot}",
+			"executable": "./build/firmware.elf",
+			"svdFile": "./mcu/stm32f407vg/openocd/STM32F407.svd",
+			"request": "launch",
+			"type": "cortex-debug",
+			"gdbPath": "gdb-multiarch", // !!! comment this on windows !!!
+			"servertype": "openocd",
+			"interface": "swd",
+			//"adapter speed": "500",
+			"runToEntryPoint": "main",
+			"configFiles": [
+				"./firmware/mcu/common/openocd/stlink.cfg",
+				"./mcu/stm32f407vg/vendor/openocd/stm32f4x.cfg"
+			]
+		},
+
+		{
+			"name": "stlink",
+			"cwd": "${workspaceRoot}/firmware",
+			"executable": "./build/firmware.elf",
+			"svdFile": "./mcu/stm32f407vg/openocd/STM32F407.svd",
+			"request": "launch",
+			"type": "cortex-debug",
+			// "gdbPath": "gdb-multiarch", // !!! comment this on windows !!!
+			"servertype": "openocd",
+			"interface": "swd",
+			"runToEntryPoint": "main",
+			"configFiles": [
+				"./mcu/common/openocd/stlink.cfg",
+				"./mcu/stm32f407vg/vendor/openocd/stm32f4x.cfg"
+			]
+		}
+	]
+}
