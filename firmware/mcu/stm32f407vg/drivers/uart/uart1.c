@@ -21,7 +21,7 @@
 #endif // UART1_RX_BUFFER_SIZE
 
 // Driver version
-const char *dev_uart1_version = "1.0.0";
+const char *dev_uart1_version = "stm32f407vgt6 uart; PA9-TX, PA10-RX; 115200n1; hardcode ver 0.0.0";
 
 // Static buffers
 static uint8_t tx_buffer[UART1_TX_BUFFER_SIZE];
@@ -212,21 +212,14 @@ static int uart_available(void) {
     return (int)available_bytes;
 }
 
-// TODO: WTF???
-// Flush RX buffer
-static int uart_flush(void) {
-    // rx_read_pos = (UART1_RX_BUFFER_SIZE - DMA2_Stream5->NDTR) % UART1_RX_BUFFER_SIZE;
-    return 0;
-}
-
 // IO Control for UART (interface implementation)
 static int uart_ioctl(int cmd, void *arg) {
     switch (cmd) {
-        case UART_INIT:
+        case INTERFACE_INIT:
             uart_init();
             return 0;
 
-        case UART_DEINIT:
+        case INTERFACE_DEINIT:
             uart_deinit();
             return 0;
 
@@ -236,23 +229,20 @@ static int uart_ioctl(int cmd, void *arg) {
             }
             return 0;
 
-        case UART_GET_VERSION:
+        case INTERFACE_GET_INFO:
             if (arg != NULL) {
                 *(const char **)arg = dev_uart1_version;
                 return 0;
             }
             return -EINVAL;       
 
-        case UART_FLUSH:
-            return uart_flush();
-            
         default:
             return -ENOTSUP;  // Command not supported
     }
 }
 
 // UART device instance
-static const interface_t dev_uart1 = {
+const interface_t dev_uart1 = {
     .read = uart_read, 
     .write = uart_write, 
     .ioctl = uart_ioctl

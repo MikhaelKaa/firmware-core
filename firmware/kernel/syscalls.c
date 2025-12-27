@@ -10,24 +10,28 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "dev_interface.h"
+
 char*  __env[1] = {0};
 char** environ  = __env;
+
+extern const interface_t dev_uart1;
 
 int _write(int file, char* ptr, int len)
 {
     if (file == STDOUT_FILENO || file == STDERR_FILENO)
     {
-        // return dev_uart1_get()->write(ptr, (size_t)len);
+        return dev_uart1.write(ptr, (size_t)len);
     }
     errno = EIO;
     return -1;
 }
 
-// Что то мне подсказывает, что это нечто кривое получилось. Но оно работает.
+
 int __io_getchar(void)
 {
     uint8_t ch = 0;
-    // dev_uart1_get()->read(&ch, 1);
+    dev_uart1.read(&ch, 1);
     return ch;
 }
 

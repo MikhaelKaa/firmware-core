@@ -143,10 +143,10 @@ static int rng_self_test(void) {
 // IO Control for RNG (interface implementation)
 static int rng_ioctrl(int cmd, void *arg) {
     switch (cmd) {
-        case RNG_INIT:
+        case INTERFACE_INIT:
             return rng_init();
             
-        case RNG_DEINIT:
+        case INTERFACE_DEINIT:
             return rng_deinit();
 
         case RNG_GET_STATUS:

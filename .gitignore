@@ -10,3 +10,4 @@
 *.bin
 
 firmware/local.mk
+.vscode/*

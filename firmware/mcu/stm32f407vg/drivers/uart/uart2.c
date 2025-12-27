@@ -185,21 +185,15 @@ static int uart_available(void) {
     return (int)available_bytes;
 }
 
-// TODO: WTF???
-// Flush RX buffer
-static int uart_flush(void) {
-    // rx_read_pos = (UART2_RX_BUFFER_SIZE - DMA1_Stream5->NDTR) % UART2_RX_BUFFER_SIZE;
-    return 0;
-}
 
 // IO Control for UART2 (interface implementation)
 static int uart_ioctl(int cmd, void *arg) {
     switch (cmd) {
-        case UART_INIT:
+        case INTERFACE_INIT:
             uart_init();
             return 0;
 
-        case UART_DEINIT:
+        case INTERFACE_DEINIT:
             uart_deinit();
             return 0;
         case UART_GET_AVAILABLE:
@@ -208,15 +202,15 @@ static int uart_ioctl(int cmd, void *arg) {
             }
             return 0;
             
-        case UART_GET_VERSION:
+        case INTERFACE_GET_INFO:
             if (arg != NULL) {
                 *(const char **)arg = dev_uart2_version;
                 return 0;
             }
             return -EINVAL;       
             
-        case UART_FLUSH:
-            return uart_flush();
+        // case UART_FLUSH:
+        //     return uart_flush();
             
         default:
             return -ENOTSUP;  // Command not supported
@@ -224,11 +218,12 @@ static int uart_ioctl(int cmd, void *arg) {
 }
 
 // UART2 device instance
-static const interface_t dev_uart2 = {.read = uart_read, .write = uart_write, .ioctl = uart_ioctl};
+const interface_t dev_uart2 = {.read = uart_read, .write = uart_write, .ioctl = uart_ioctl};
 
 const interface_t* dev_uart2_get(void)
 {
-    return (const interface_t*)&dev_uart2;
+    // return (const interface_t*)&dev_uart2;
+    return &dev_uart2;
 }
 
 // USART2 Interrupt Handler

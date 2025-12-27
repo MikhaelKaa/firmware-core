@@ -36,4 +36,4 @@ FLOAT-ABI = -mfloat-abi=hard
 # link script
 LDSCRIPT = ./mcu/$(MCU_PATH)/vendor/linker/STM32F407VGTx_FLASH.ld
 
-OPENOCD_MCU_CFG ?= ./firmware/mcu/$(MCU_PATH)/vendor/openocd/stm32f4x.cfg
+OPENOCD_MCU_CFG ?= ./mcu/$(MCU_PATH)/vendor/openocd/stm32f4x.cfg

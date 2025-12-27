@@ -8,8 +8,8 @@
 #include <stdint.h>
 
 // RNG-specific ioctl commands
-#define RNG_INIT       (INTERFACE_CMD_DEVICE + 0)
-#define RNG_DEINIT     (INTERFACE_CMD_DEVICE + 1)
+// #define RNG_INIT       (INTERFACE_CMD_DEVICE + 0)
+// #define RNG_DEINIT     (INTERFACE_CMD_DEVICE + 1)
 #define RNG_GET_STATUS (INTERFACE_CMD_DEVICE + 2)
 #define RNG_RESET      (INTERFACE_CMD_DEVICE + 3)
 #define RNG_SELF_TEST  (INTERFACE_CMD_DEVICE + 4)

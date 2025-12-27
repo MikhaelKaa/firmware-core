@@ -145,6 +145,18 @@ clean:
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
 
+# vscode debugger setup for kernel
+setup-vscode:
+	@if [ -d "./mcu/$(MCU_PATH)/.vscode" ]; then \
+		echo "Copying .vscode files from ./mcu/$(MCU_PATH)/.vscode to ../"; \
+		rm -rf ../.vscode; \
+		mkdir ../.vscode; \
+		cp -r ./mcu/$(MCU_PATH)/.vscode/* ../.vscode/; \
+		echo "Done."; \
+	else \
+		echo "Warning: .vscode directory not found in ./mcu/$(MCU_PATH)/"; \
+	fi
+
 #  default OpenOCD transport (see local.mk)
 OPENOCD_TRANSPORT_CFG ?= ./firmware/mcu/common/openocd/stlink.cfg
 # Load firmware.bin (hex) use OpenOCD
