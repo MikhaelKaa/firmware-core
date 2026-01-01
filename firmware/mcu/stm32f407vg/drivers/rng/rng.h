@@ -4,7 +4,7 @@
 #ifndef DEV_RNG_H
 #define DEV_RNG_H
 
-#include "dev_interface.h"
+#include "drv_face.h"
 #include <stdint.h>
 
 // RNG-specific ioctl commands
@@ -24,6 +24,6 @@
 #define RNG_TIMEOUT            10000  // Timeout for RNG operations
 
 // RNG device instance
-const interface_t* dev_rng_get(void);
+const drv_face_t* dev_rng_get(void);
 
 #endif /* DEV_RNG_H */

@@ -6,6 +6,9 @@
 #include <string.h>
 #include <errno.h>
 
+// Version
+const char *dev_rng_version = "stm32f407vgt6 rng; hardcode ver 0.0.0";
+
 // Internal state
 static volatile uint32_t rng_status = 0;
 
@@ -141,39 +144,47 @@ static int rng_self_test(void) {
 }
 
 // IO Control for RNG (interface implementation)
-static int rng_ioctrl(int cmd, void *arg) {
+static int rng_ioctl(int cmd, void *arg) {
     switch (cmd) {
         case INTERFACE_INIT:
             return rng_init();
             
         case INTERFACE_DEINIT:
             return rng_deinit();
-
+            
+            case INTERFACE_GET_INFO:
+            if (arg != NULL) {
+                *(const char **)arg = dev_rng_version;
+                return 0;
+            }
+            return -EINVAL;    
+            
+            
         case RNG_GET_STATUS:
             if (arg != NULL) {
                 *(uint32_t *)arg = rng_get_status();
             }
             return 0;
-            
+
         case RNG_RESET:
             return rng_reset();
             
         case RNG_SELF_TEST:
             return rng_self_test();
-            
+        
         default:
             return -ENOTSUP;
     }
 }
 
 // RNG device instance
-static const interface_t dev_rng = {
+static const drv_face_t dev_rng = {
     .read = rng_read,
     .write = rng_write,
-    .ioctl = rng_ioctrl
+    .ioctl = rng_ioctl
 };
 
 // RNG device instance accessor
-const interface_t* dev_rng_get(void) {
-    return (const interface_t*)&dev_rng;
+const drv_face_t* dev_rng_get(void) {
+    return (const drv_face_t*)&dev_rng;
 }

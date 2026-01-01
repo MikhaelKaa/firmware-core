@@ -21,7 +21,7 @@
 #endif // UART1_RX_BUFFER_SIZE
 
 // Driver version
-const char *dev_uart1_version = "stm32f407vgt6 uart; PA9-TX, PA10-RX; 115200n1; hardcode ver 0.0.0";
+const char *dev_uart1_version = "stm32f407vgt6 uart1; PA9-TX, PA10-RX; 115200n1; hardcode ver 0.0.0";
 
 // Static buffers
 static uint8_t tx_buffer[UART1_TX_BUFFER_SIZE];
@@ -234,7 +234,7 @@ static int uart_ioctl(int cmd, void *arg) {
                 *(const char **)arg = dev_uart1_version;
                 return 0;
             }
-            return -EINVAL;       
+            return -EINVAL;
 
         default:
             return -ENOTSUP;  // Command not supported
@@ -242,15 +242,15 @@ static int uart_ioctl(int cmd, void *arg) {
 }
 
 // UART device instance
-const interface_t dev_uart1 = {
+const drv_face_t dev_uart1 = {
     .read = uart_read, 
     .write = uart_write, 
     .ioctl = uart_ioctl
 };
 
-const interface_t* dev_uart1_get(void)
+const drv_face_t* dev_uart1_get(void)
 {
-    return (const interface_t*) &dev_uart1;
+    return (const drv_face_t*) &dev_uart1;
 }
 
 // USART1 Interrupt Handler

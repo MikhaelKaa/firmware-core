@@ -10,12 +10,12 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "dev_interface.h"
+#include "drv_face.h"
 
 char*  __env[1] = {0};
 char** environ  = __env;
 
-extern const interface_t dev_uart1;
+extern const drv_face_t dev_uart1;
 
 int _write(int file, char* ptr, int len)
 {
@@ -129,11 +129,11 @@ int _unlink(char* name)
     return -1;
 }
 
-clock_t _times(struct tms* buf)
-{
-    (void)buf;
-    return (clock_t)(-1);
-}
+// clock_t _times(struct tms* buf)
+// {
+//     (void)buf;
+//     return (clock_t)(-1);
+// }
 
 int _stat(const char* file, struct stat* st)
 {

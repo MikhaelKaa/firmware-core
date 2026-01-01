@@ -22,6 +22,10 @@ sinclude ./local.mk
 C_SOURCES += kernel/kernel.c
 C_SOURCES += kernel/syscalls.c
 C_SOURCES += kernel/sysmem.c
+C_SOURCES += kernel/svccalls.c
+C_SOURCES += kernel/drv_face.c
+
+
 
 # C includes
 C_INCLUDES += -Ikernel

@@ -4,7 +4,9 @@
             "name": "Linux",
             "compilerPath": "/usr/bin/arm-none-eabi-gcc",
             "includePath": [
-                "/usr/include/newlib"
+                "/usr/include/newlib",
+                "${workspaceFolder}/firmware/kernel",
+                "${workspaceFolder}/firmware/mcu/stm32f407vg/vendor/CMSIS"
             ],
             "defines": [
                 "STM32F407xx",
@@ -18,7 +20,9 @@
             "name": "Win",
             "includePath": [
                 "C:/arm_tool/gcc/arm-none-eabi/include",
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/firmware/kernel",
+                "${workspaceFolder}/firmware/mcu/stm32f407vg/vendor/CMSIS"
             ],
             "defines": [
                 "BAREMETAL",

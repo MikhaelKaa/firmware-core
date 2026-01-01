@@ -8,6 +8,6 @@
 #include <stdint.h>
 
 // RCC device instance
-const interface_t* dev_rcc_get(void);
+const drv_face_t* dev_rcc_get(void);
 
 #endif /* DEV_RCC_H */

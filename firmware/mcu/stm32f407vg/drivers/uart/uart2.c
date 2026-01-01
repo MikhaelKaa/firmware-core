@@ -33,7 +33,7 @@ static volatile uint8_t tx_in_progress = 0;
 static volatile uint32_t tx_complete_flag = 0;
 
 // Driver version
-const char *dev_uart2_version = "1.0.0";
+const char *dev_uart2_version = "stm32f407vgt6 uart2; PA2-TX, PA3-RX; 115200n1; hardcode ver 0.0.0";
 
 static int uart_available(void);
 
@@ -196,6 +196,7 @@ static int uart_ioctl(int cmd, void *arg) {
         case INTERFACE_DEINIT:
             uart_deinit();
             return 0;
+            
         case UART_GET_AVAILABLE:
             if (arg != NULL) {
                 *(int *)arg = uart_available();
@@ -218,11 +219,11 @@ static int uart_ioctl(int cmd, void *arg) {
 }
 
 // UART2 device instance
-const interface_t dev_uart2 = {.read = uart_read, .write = uart_write, .ioctl = uart_ioctl};
+const drv_face_t dev_uart2 = {.read = uart_read, .write = uart_write, .ioctl = uart_ioctl};
 
-const interface_t* dev_uart2_get(void)
+const drv_face_t* dev_uart2_get(void)
 {
-    // return (const interface_t*)&dev_uart2;
+    // return (const drv_face_t*)&dev_uart2;
     return &dev_uart2;
 }
 
