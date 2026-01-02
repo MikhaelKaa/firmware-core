@@ -6,6 +6,7 @@
 
 #include "drv_face.h"
 #include "svccalls.h"
+#include "mem.h"
 
 extern const drv_face_t dev_uart1;
 
@@ -27,7 +28,8 @@ int main(void)
     uart->ioctl(INTERFACE_GET_INFO, &uart_ver);
     printf("%s\r\n", uart_ver);
 
-
+    dev_memory_print_info();
+    
     for(volatile int i = 0; i < INT16_MAX*256; i++) asm("nop");
 
     while (1)

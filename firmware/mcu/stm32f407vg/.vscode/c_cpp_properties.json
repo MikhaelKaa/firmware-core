@@ -6,7 +6,8 @@
             "includePath": [
                 "/usr/include/newlib",
                 "${workspaceFolder}/firmware/kernel",
-                "${workspaceFolder}/firmware/mcu/stm32f407vg/vendor/CMSIS"
+                "${workspaceFolder}/firmware/mcu/stm32f407vg/vendor/CMSIS",
+                "${workspaceFolder}/firmware/mcu/stm32f407vg/drivers/mem"
             ],
             "defines": [
                 "STM32F407xx",
@@ -20,9 +21,7 @@
             "name": "Win",
             "includePath": [
                 "C:/arm_tool/gcc/arm-none-eabi/include",
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/firmware/kernel",
-                "${workspaceFolder}/firmware/mcu/stm32f407vg/vendor/CMSIS"
+                "${workspaceFolder}/**"
             ],
             "defines": [
                 "BAREMETAL",
