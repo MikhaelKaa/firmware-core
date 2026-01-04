@@ -1,6 +1,7 @@
 *.d
 *.o
 *.lst
+*.su
 
 *.map
 *.disasm

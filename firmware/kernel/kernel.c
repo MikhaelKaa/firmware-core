@@ -36,6 +36,8 @@ int main(void)
     {
         printf("%s\r\n", msg);
 
+        // printf("test ret svc (expect -22): %d\r\n", fc_drv_table_get(&uart, 42));
+
         for(volatile int i = 0; i < INT16_MAX*64; i++) asm("nop");
     }
 }

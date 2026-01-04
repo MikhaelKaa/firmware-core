@@ -73,6 +73,7 @@ CFLAGS += -Wconversion
 # CFLAGS += -Wstrict-prototypes
 CFLAGS += -fdata-sections
 CFLAGS += -ffunction-sections
+CFLAGS += -fstack-usage
 CFLAGS += -D_DEBUG
 CFLAGS += -D_DEFAULT_SOURCE
 

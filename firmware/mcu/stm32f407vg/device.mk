@@ -1,5 +1,8 @@
 #  stm32f407vg make
 
+HEAP_SIZE  ?= 0x0400
+STACK_SIZE ?= 0x0800
+
 # C sources
 C_SOURCES += mcu/$(MCU_PATH)/drivers/rcc/rcc.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/rng/rng.c
@@ -37,5 +40,7 @@ FLOAT-ABI = -mfloat-abi=hard
 
 # link script
 LDSCRIPT = ./mcu/$(MCU_PATH)/vendor/linker/STM32F407VGTx_FLASH.ld
+LDFLAGS += -Wl,--defsym=_Min_Heap_Size=$(HEAP_SIZE)
+LDFLAGS += -Wl,--defsym=_Min_Stack_Size=$(STACK_SIZE)
 
 OPENOCD_MCU_CFG ?= ./mcu/$(MCU_PATH)/vendor/openocd/stm32f4x.cfg
