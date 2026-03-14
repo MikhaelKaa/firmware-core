@@ -9,7 +9,7 @@
 
 // Глобальные переменные для хранения текущего времени и долей секунды
 static rtc_date_time_t rtc_now;
-__attribute__((aligned(4))) static float subseconds = 0.0f;
+// __attribute__((aligned(4))) static float subseconds = 0.0f;
 
 void time_set(uint8_t h, uint8_t m, uint8_t s);
 void time_print(void);

@@ -7,7 +7,7 @@
 #include "drv_face.h"
 #include <stdint.h>
 
-#define RTC_MAGIC_NUMBER    (0xF55FA00AU)
+extern const uint32_t rtc_magic_number;
 
 void RTC_init(void);
 

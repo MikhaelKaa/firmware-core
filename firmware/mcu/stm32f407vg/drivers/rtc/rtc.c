@@ -8,6 +8,7 @@
 
 #define RTC_TIMEOUT         1000000U
 
+const uint32_t rtc_magic_number = 0xF55FA00AU;
 
 void RTC_init(void)
 {
@@ -20,7 +21,7 @@ void RTC_init(void)
     }
 
     // Проверка магического числа
-    if ((RTC->BKP0R & 0xFFFF) == RTC_MAGIC_NUMBER) {
+    if (RTC->BKP0R == rtc_magic_number) {
         // RTC уже инициализирован – только включаем, если выключен
         if (!(RCC->BDCR & RCC_BDCR_RTCEN)) {
             RCC->BDCR |= RCC_BDCR_RTCEN;
@@ -83,5 +84,5 @@ void RTC_init(void)
     }
 
     // Записываем магическое число
-    RTC->BKP0R = RTC_MAGIC_NUMBER;
+    RTC->BKP0R = rtc_magic_number;
 }
