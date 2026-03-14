@@ -7,6 +7,9 @@
 #include "drv_face.h"
 #include "svccalls.h"
 #include "mem.h"
+#include "ucmd.h"
+#include "rtc.h"
+
 
 extern const drv_face_t dev_uart1;
 
@@ -28,16 +31,18 @@ int main(void)
     uart->ioctl(INTERFACE_GET_INFO, &uart_ver);
     printf("%s\r\n", uart_ver);
 
+    RTC_init();
+
     dev_memory_print_info();
     
-    for(volatile int i = 0; i < INT16_MAX*256; i++) asm("nop");
+    // for(volatile int i = 0; i < INT16_MAX*256; i++) asm("nop");
+    ucmd_default_init();
 
     while (1)
     {
-        printf("%s\r\n", msg);
+        ucmd_default_proc();
 
-        // printf("test ret svc (expect -22): %d\r\n", fc_drv_table_get(&uart, 42));
+        for(volatile unsigned int i = 0; i < 12345U; i++) asm("nop");
 
-        for(volatile int i = 0; i < INT16_MAX*64; i++) asm("nop");
     }
 }

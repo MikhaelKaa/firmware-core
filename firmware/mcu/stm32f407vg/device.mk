@@ -9,6 +9,7 @@ C_SOURCES += mcu/$(MCU_PATH)/drivers/rng/rng.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/uart/uart1.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/uart/uart2.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/mem/mem.c
+C_SOURCES += mcu/$(MCU_PATH)/drivers/rtc/rtc.c
 
 # C includes
 C_INCLUDES += -Imcu/$(MCU_PATH)/vendor/CMSIS
@@ -16,6 +17,8 @@ C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rcc
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rng
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/uart
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/mem
+C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rtc
+
 
 # ASM sources
 ASM_SOURCES +=  ./mcu/$(MCU_PATH)/vendor/startup/startup_stm32f407xx.s

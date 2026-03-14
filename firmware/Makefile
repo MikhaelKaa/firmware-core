@@ -24,12 +24,17 @@ C_SOURCES += kernel/syscalls.c
 C_SOURCES += kernel/sysmem.c
 C_SOURCES += kernel/svccalls.c
 C_SOURCES += kernel/drv_face.c
-
-
-
 # C includes
 C_INCLUDES += -Ikernel
 
+# App CMD Read line
+C_SOURCES += app/u_read_line/microrl.c
+C_SOURCES += app/u_read_line/ucmd.c
+C_INCLUDES += -Iapp/u_read_line
+
+# App memory viewer
+C_SOURCES += app/mem/memory_man.c
+C_INCLUDES += -Iapp/mem
 
 #######################################
 # binaries
@@ -163,9 +168,9 @@ setup-vscode:
 	fi
 
 #  default OpenOCD transport (see local.mk)
-OPENOCD_TRANSPORT_CFG ?= ./firmware/mcu/common/openocd/stlink.cfg
+OPENOCD_TRANSPORT_CFG ?= mcu/common/openocd/stlink.cfg
 # Load firmware.bin (hex) use OpenOCD
 load:
-	openocd -f $(OPENOCD_TRANSPORT_CFG) -f $(OPENOCD_MCU_CFG) -c init -c "reset halt" -c "flash write_image erase $(BUILD_DIR)/$(TARGET).hex" -c "reset run" -c "exit"
+	openocd.exe -f $(OPENOCD_TRANSPORT_CFG) -f $(OPENOCD_MCU_CFG) -c init -c "reset halt" -c "flash write_image erase $(BUILD_DIR)/$(TARGET).hex" -c "reset run" -c "exit"
 
 # *** EOF ***

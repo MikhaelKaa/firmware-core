@@ -4,10 +4,10 @@
 #ifndef DEV_RCC_H
 #define DEV_RCC_H
 
-#include "dev_interface.h"
+#include "drv_face.h"
 #include <stdint.h>
 
 // RCC device instance
-const drv_face_t* dev_rcc_get(void);
+// const drv_face_t* dev_rcc_get(void);
 
 #endif /* DEV_RCC_H */
