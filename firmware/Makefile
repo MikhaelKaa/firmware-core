@@ -36,6 +36,11 @@ C_INCLUDES += -Iapp/u_read_line
 C_SOURCES += app/mem/memory_man.c
 C_INCLUDES += -Iapp/mem
 
+# App time
+C_SOURCES += app/time/ucmd_time.c
+C_INCLUDES += -Iapp/time
+
+
 #######################################
 # binaries
 #######################################

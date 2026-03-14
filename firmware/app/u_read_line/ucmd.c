@@ -8,6 +8,7 @@
 #include "microrl.h"
 
 #include "memory_man.h"
+#include "ucmd_time.h"
 
 int ucmd_parse(command_t cmd_list[], int argc, const char **argv)
 {
@@ -53,11 +54,11 @@ command_t cmd_list[] = {
     .help = "memory man, use mem help",
     .fn   = ucmd_mem,
   },
-  // {
-  //   .cmd  = "time",
-  //   .help = "rtc time. to set type time hh mm ss",
-  //   .fn   = ucmd_time,
-  // },
+  {
+    .cmd  = "time",
+    .help = "rtc time. to set type time hh mm ss",
+    .fn   = ucmd_time,
+  },
   
   {}, // null list terminator DON'T FORGET THIS!
 };

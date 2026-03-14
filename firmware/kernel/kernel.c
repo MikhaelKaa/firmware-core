@@ -9,13 +9,14 @@
 #include "mem.h"
 #include "ucmd.h"
 #include "rtc.h"
+#include "rtc_time.h"
 
 
 extern const drv_face_t dev_uart1;
 
 int main(void)
 {
-    char msg[] = "Its work";
+    // char msg[] = "Its work";
     char *uart_ver = 0;
     drv_face_t* uart = 0;
 
@@ -31,7 +32,11 @@ int main(void)
     uart->ioctl(INTERFACE_GET_INFO, &uart_ver);
     printf("%s\r\n", uart_ver);
 
+    printf("RTC RTC_is_initialized %d\r\n", RTC_is_initialized());
     RTC_init();
+    rtc_date_time_t dt;
+    RTC_get_date_time(&dt);
+    printf("time: %d:%d:%d\r\n", dt.hours, dt.minutes, dt.seconds);
 
     dev_memory_print_info();
     

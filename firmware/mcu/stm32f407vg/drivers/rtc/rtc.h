@@ -7,8 +7,7 @@
 #include "drv_face.h"
 #include <stdint.h>
 
-// RTC device instance
-// const drv_face_t* dev_rtc_get(void);
+#define RTC_MAGIC_NUMBER    (0xF55FA00AU)
 
 void RTC_init(void);
 

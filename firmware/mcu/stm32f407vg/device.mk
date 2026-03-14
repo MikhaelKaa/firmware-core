@@ -10,6 +10,8 @@ C_SOURCES += mcu/$(MCU_PATH)/drivers/uart/uart1.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/uart/uart2.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/mem/mem.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/rtc/rtc.c
+C_SOURCES += mcu/$(MCU_PATH)/drivers/rtc/rtc_time.c
+
 
 # C includes
 C_INCLUDES += -Imcu/$(MCU_PATH)/vendor/CMSIS
