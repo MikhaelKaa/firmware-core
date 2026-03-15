@@ -104,9 +104,10 @@ void RTC_get_date_time(rtc_date_time_t *dt)
     }
     if (timeout == 0U) printf("RTC_get_date_time timeout\r\n");
     
-    tr = RTC->TR;
-    dr = RTC->DR;
+    // порядок чтения регистров важен.
     ssr = RTC->SSR;  // значение субсекунд (уменьшается от 255 до 0)
+    tr  = RTC->TR;
+    dr  = RTC->DR;
 
     dt->seconds = bcd2bin((tr >> 0U)  & 0x7FU);
     dt->minutes = bcd2bin((tr >> 8U)  & 0x7FU);
