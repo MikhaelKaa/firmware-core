@@ -48,7 +48,7 @@ int main(void)
     
     printf("micros: %ld\r\n", micros());
     
-    pwm_led.set_mode(LED_MODE_BREATHE, 2000, 10, 250);
+    pwm_led.set_mode(LED_MODE_BREATHE, 1000, 25, 255);
     
     ucmd_default_init();
 

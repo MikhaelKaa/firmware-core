@@ -1,4 +1,4 @@
-// pwm_led.c (исправленная версия с использованием оператора % для обновления фазы)
+// pwm_led.c
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2025 Michael Kaa */
 
@@ -107,7 +107,15 @@ static void pwm_set_mode(led_mode_t mode, uint16_t period_ms, uint8_t min_bright
 // Main processing routine – call frequently
 static void pwm_proc(void) {
     uint32_t now = micros();
-    uint32_t dt = now - led.last_update;   // время с предыдущего вызова (us)
+
+    // Обработка переполнения micros: если now меньше предыдущего значения,
+    // значит счётчик переполнился – просто обновляем last_update и выходим
+    if (now < led.last_update) {
+        led.last_update = now;
+        return;
+    }
+
+    uint32_t dt = now - led.last_update;
     if (dt < 1000) return;                 // обновление не чаще 1 мс
 
     led.last_update = now;
