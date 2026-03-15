@@ -45,17 +45,17 @@ int main(void)
     printf("time: %02d:%02d:%02d.%02d\r\n", date_time.hours, date_time.minutes, date_time.seconds, date_time.centiseconds);
 
     dev_memory_print_info();
-
-    ucmd_default_init();
-
+    
     printf("micros: %ld\r\n", micros());
-
+    
     pwm_led.set_mode(LED_MODE_BREATHE, 2000, 10, 250);
+    
+    ucmd_default_init();
 
     while (1)
     {
         ucmd_default_proc();
         pwm_led.proc();
-        for(volatile unsigned int i = 0; i < 12345U; i++) asm("nop");
+        for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
     }
 }
