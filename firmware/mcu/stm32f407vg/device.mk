@@ -11,7 +11,7 @@ C_SOURCES += mcu/$(MCU_PATH)/drivers/uart/uart2.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/mem/mem.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/rtc/rtc.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/rtc/rtc_time.c
-
+C_SOURCES += mcu/$(MCU_PATH)/drivers/led/pwm_led.c
 
 # C includes
 C_INCLUDES += -Imcu/$(MCU_PATH)/vendor/CMSIS
@@ -20,6 +20,7 @@ C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rng
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/uart
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/mem
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rtc
+C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/led
 
 
 # ASM sources

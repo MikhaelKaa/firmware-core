@@ -5,6 +5,8 @@
 
 #include "stm32f407xx.h"
 
+const uint32_t system_core_clock = 168000000;
+
 void SystemInit(void)
 {
     volatile uint32_t timeout = 0;

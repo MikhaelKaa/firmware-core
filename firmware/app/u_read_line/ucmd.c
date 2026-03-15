@@ -9,6 +9,7 @@
 
 #include "memory_man.h"
 #include "ucmd_time.h"
+#include "ucmd_led.h"
 
 int ucmd_parse(command_t cmd_list[], int argc, const char **argv)
 {
@@ -59,8 +60,12 @@ command_t cmd_list[] = {
     .help = "rtc time. to set type time hh mm ss",
     .fn   = ucmd_time,
   },
-  
-  {}, // null list terminator DON'T FORGET THIS!
+  {
+    .cmd  = "led",
+    .help = "led PA1 ctrl",
+    .fn   = ucmd_led,
+  },
+  {0}, // null list terminator DON'T FORGET THIS!
 };
 
 int ucmd_execute(int argc, char **argv) {

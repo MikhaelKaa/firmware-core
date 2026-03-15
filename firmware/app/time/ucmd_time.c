@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "rtc_time.h"
-
+#include "micros.h"
 
 void time_set(uint8_t h, uint8_t m, uint8_t s);
 void time_print(void);
@@ -55,4 +55,5 @@ void time_print(void) {
     rtc_date_time_t td;// = {0};
     RTC_get_date_time(&td);
     printf("%02d:%02d:%02d.%02d\r\n", td.hours, td.minutes, td.seconds, td.centiseconds);
+    printf("micros: %ld\r\n", micros());
 }

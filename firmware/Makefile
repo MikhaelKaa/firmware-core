@@ -40,6 +40,12 @@ C_INCLUDES += -Iapp/mem
 C_SOURCES += app/time/ucmd_time.c
 C_INCLUDES += -Iapp/time
 
+# micros
+C_INCLUDES += -Iapp/micros
+
+# App led
+C_SOURCES += app/led/ucmd_led.c
+C_INCLUDES += -Iapp/led
 
 #######################################
 # binaries
