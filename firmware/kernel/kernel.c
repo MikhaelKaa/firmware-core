@@ -32,15 +32,14 @@ int main(void)
     uart->ioctl(INTERFACE_GET_INFO, &uart_ver);
     printf("%s\r\n", uart_ver);
 
-    printf("RTC RTC_is_initialized %d\r\n", RTC_is_initialized());
+    printf("RTC is initialized: %s\r\n", (RTC_is_initialized())?("true"):("false"));
     RTC_init();
-    rtc_date_time_t dt;
-    RTC_get_date_time(&dt);
-    printf("time: %d:%d:%d\r\n", dt.hours, dt.minutes, dt.seconds);
+    rtc_date_time_t date_time;
+    RTC_get_date_time(&date_time);
+    printf("time: %02d:%02d:%02d.%02d\r\n", date_time.hours, date_time.minutes, date_time.seconds, date_time.centiseconds);
 
     dev_memory_print_info();
-    
-    // for(volatile int i = 0; i < INT16_MAX*256; i++) asm("nop");
+
     ucmd_default_init();
 
     while (1)
@@ -48,6 +47,5 @@ int main(void)
         ucmd_default_proc();
 
         for(volatile unsigned int i = 0; i < 12345U; i++) asm("nop");
-
     }
 }

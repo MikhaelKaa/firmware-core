@@ -94,7 +94,7 @@ void RTC_set_date_time(const rtc_date_time_t *dt)
 
 void RTC_get_date_time(rtc_date_time_t *dt)
 {
-    uint32_t tr, dr;
+    uint32_t tr, dr, ssr;
     uint32_t timeout;
 
     // Ждём синхронизации (теневые регистры)
@@ -102,9 +102,11 @@ void RTC_get_date_time(rtc_date_time_t *dt)
     while (!(RTC->ISR & RTC_ISR_RSF) && timeout--) {
         __NOP();
     }
-
+    if (timeout == 0U) printf("RTC_get_date_time timeout\r\n");
+    
     tr = RTC->TR;
     dr = RTC->DR;
+    ssr = RTC->SSR;  // значение субсекунд (уменьшается от 255 до 0)
 
     dt->seconds = bcd2bin((tr >> 0U)  & 0x7FU);
     dt->minutes = bcd2bin((tr >> 8U)  & 0x7FU);
@@ -114,4 +116,9 @@ void RTC_get_date_time(rtc_date_time_t *dt)
     dt->month   = bcd2bin((dr >> 8U)  & 0x1FU);
     dt->year    = bcd2bin((dr >> 16U) & 0xFFU);
     dt->weekday = (uint8_t)((dr >> 13U) & 0x7U);
+
+    // Вычисление сотых долей секунды: (255 - SSR) * 100 / 255
+    // Приводим к uint32_t для промежуточных вычислений, чтобы избежать переполнения
+    uint32_t raw = 255U - (ssr & 0xFFU); // ssr обычно 16 бит, но синхронный предделитель = 255, поэтому младшие 8 бит
+    dt->centiseconds = (uint8_t)((raw * 100U) / 255U);
 }

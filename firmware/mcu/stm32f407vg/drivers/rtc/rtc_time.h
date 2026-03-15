@@ -10,18 +10,19 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "stm32f407xx.h"   // для доступа к RTC->SSR
+#include "stm32f407xx.h"
 #include "rtc.h"
 
 // Структура для хранения даты и времени
 typedef struct {
-    uint8_t hours;      // 0-23
-    uint8_t minutes;    // 0-59
-    uint8_t seconds;    // 0-59
-    uint8_t day;        // 1-31
-    uint8_t month;      // 1-12
-    uint8_t year;       // 0-99 (год от 2000)
-    uint8_t weekday;    // 1-7 (понедельник=1)
+    uint8_t year;         // 0-99 (год от 2000)
+    uint8_t month;        // 1-12
+    uint8_t weekday;      // 1-7 (понедельник=1)
+    uint8_t day;          // 1-31
+    uint8_t hours;        // 0-23
+    uint8_t minutes;      // 0-59
+    uint8_t seconds;      // 0-59
+    uint8_t centiseconds; // 0-99 (сотые доли секунды)
 } rtc_date_time_t;
 
 // Проверка инициализации RTC

@@ -9,6 +9,9 @@ void SystemInit(void)
 {
     volatile uint32_t timeout = 0;
 
+    // Включение FPU
+    SCB->CPACR |= ((3UL << 10*2) | (3UL << 11*2)); /* set CP10 and CP11 Full Access */
+
     // Включение тактирования Backup Domain и PWR
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
     
