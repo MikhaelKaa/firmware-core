@@ -6,6 +6,10 @@
 #include <string.h>
 #include <stdint.h>
 
+// Предполагаем, что у нас есть глобальный экземпляр драйвера,
+// объявленный в pwm_led_drv.h как extern const drv_face_t pwm_led_dev.
+// Если нужно получать драйвер через таблицу, можно использовать соответствующий механизм.
+
 // Текущее состояние LED (сохраняем, чтобы показывать по запросу)
 static struct {
     led_mode_t mode;
@@ -43,13 +47,15 @@ static void print_status(void) {
     }
 }
 
-// Проверка и обновление состояния
+// Проверка и обновление состояния с использованием нового драйвера
 static void set_led_mode(led_mode_t mode, uint16_t period_ms, uint8_t min_bright, uint8_t max_bright) {
     led_state.mode = mode;
     led_state.period_ms = period_ms;
     led_state.min_bright = min_bright;
     led_state.max_bright = max_bright;
-    pwm_led.set_mode(mode, period_ms, min_bright, max_bright);
+
+    // Вызов inline-обёртки для нового драйвера
+    pwm_led_set_mode((drv_face_t*)&pwm_led_dev, mode, period_ms, min_bright, max_bright);
 }
 
 int ucmd_led(int argc, char *argv[]) {

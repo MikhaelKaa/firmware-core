@@ -1,14 +1,15 @@
-// pwm_led.c
+// pwm_led_drv.c
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2025 Michael Kaa */
 
 #include "pwm_led.h"
 #include "stm32f407xx.h"
 #include "micros.h"
+#include <errno.h>
 
 #define PWM_PERIOD           256
 
-// Private variables
+// Состояние драйвера (одно на весь модуль, так как управляем одним светодиодом)
 static volatile struct {
     led_mode_t mode;
     uint32_t   period_us;           // полный цикл в микросекундах
@@ -27,36 +28,36 @@ static volatile struct {
     .phase = 0
 };
 
-// Set PWM compare value (0..255) with inversion for active-low output
+// Установка значения сравнения ШИМ (аппаратная)
 static void set_compare(uint8_t bright) {
     TIM2->CCR2 = bright;
 }
 
-// Initialize TIM2 channel 2 on PA1 for PWM (active low, push-pull)
+// Инициализация аппаратуры (GPIO, таймер)
 static void pwm_init_hw(void) {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
-    // Configure PA1 as alternate function AF1 (TIM2)
+    // PA1 as AF1 (TIM2)
     GPIOA->MODER &= ~GPIO_MODER_MODER1;
-    GPIOA->MODER |= GPIO_MODER_MODER1_1;      // 10 = alternate function
-    GPIOA->AFR[0] &= ~GPIO_AFRL_AFSEL1;       // clear AF bits for PA1
-    GPIOA->AFR[0] |= (1 << GPIO_AFRL_AFSEL1_Pos); // AF1 for TIM2
+    GPIOA->MODER |= GPIO_MODER_MODER1_1;      // alternate function
+    GPIOA->AFR[0] &= ~GPIO_AFRL_AFSEL1;
+    GPIOA->AFR[0] |= (1 << GPIO_AFRL_AFSEL1_Pos); // AF1
 
     GPIOA->OTYPER &= ~GPIO_OTYPER_OT1;        // push-pull
-    GPIOA->OSPEEDR |= GPIO_OSPEEDR_OSPEED1;   // very high speed
+    GPIOA->OSPEEDR |= GPIO_OSPEEDR_OSPEED1;   // high speed
     GPIOA->PUPDR &= ~GPIO_PUPDR_PUPDR1;       // no pull
 
     // Reset TIM2
     RCC->APB1RSTR |= RCC_APB1RSTR_TIM2RST;
     RCC->APB1RSTR &= ~RCC_APB1RSTR_TIM2RST;
 
-    // Configure TIM2: 1 MHz timer clock (168 MHz / 168)
+    // TIM2 config: 1 MHz timer clock (168 MHz / 168)
     TIM2->PSC = 168 - 1;
     TIM2->ARR = PWM_PERIOD - 1;
     TIM2->CNT = 0;
 
-    // PWM mode 1, preload enable, polarity low (active low)
+    // PWM mode 1, preload enable, active low
     TIM2->CCMR1 &= ~TIM_CCMR1_OC2M;
     TIM2->CCMR1 |= TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1; // 110 = PWM mode 1
     TIM2->CCMR1 |= TIM_CCMR1_OC2PE;
@@ -66,31 +67,23 @@ static void pwm_init_hw(void) {
     TIM2->CR1 |= TIM_CR1_CEN;                   // start timer
 }
 
-// Public: init hardware and set default state
-static void pwm_init(void) {
-    pwm_init_hw();
-    set_compare(0);
-    led.mode = LED_MODE_OFF;
-    led.last_update = micros();
-    led.phase = 0;
-}
-
-// Public: set brightness immediately (0..255)
+// Установка яркости (мгновенная)
 static void pwm_set_brightness(uint8_t brightness) {
     led.current_bright = brightness;
     set_compare(brightness);
 }
 
-// Public: set operation mode
-static void pwm_set_mode(led_mode_t mode, uint16_t period_ms, uint8_t min_bright, uint8_t max_bright) {
+// Установка режима работы
+static void pwm_set_mode(led_mode_t mode, uint16_t period_ms,
+                         uint8_t min_bright, uint8_t max_bright) {
     led.mode = mode;
     led.period_us = (uint32_t)period_ms * 1000;
     led.min_bright = min_bright;
     led.max_bright = max_bright;
     led.last_update = micros();
-    led.phase = 0;          // сбрасываем фазу при смене режима
+    led.phase = 0;
 
-    // Для режимов без периодичности устанавливаем сразу
+    // Для статических режимов сразу устанавливаем яркость
     switch (mode) {
         case LED_MODE_OFF:
             pwm_set_brightness(0);
@@ -99,17 +92,15 @@ static void pwm_set_mode(led_mode_t mode, uint16_t period_ms, uint8_t min_bright
             pwm_set_brightness(max_bright);
             break;
         default:
-            // остальные режимы будут обновляться в proc
             break;
     }
 }
 
-// Main processing routine – call frequently
+// Периодическая обработка (вызывается из главного цикла)
 static void pwm_proc(void) {
     uint32_t now = micros();
 
-    // Обработка переполнения micros: если now меньше предыдущего значения,
-    // значит счётчик переполнился – просто обновляем last_update и выходим
+    // Обработка переполнения micros()
     if (now < led.last_update) {
         led.last_update = now;
         return;
@@ -117,48 +108,45 @@ static void pwm_proc(void) {
 
     uint32_t dt = now - led.last_update;
     if (dt < 1000) return;                 // обновление не чаще 1 мс
-
     led.last_update = now;
 
-    if (led.period_us == 0) return;        // для режимов OFF/ON ничего не делаем
+    if (led.period_us == 0) return;        // для OFF/ON ничего не делаем
 
-    // Обновляем фазу: добавляем dt и приводим к диапазону [0, period_us-1]
     led.phase = (led.phase + dt) % led.period_us;
-
-    uint32_t t = led.phase;   // текущая позиция внутри периода
+    uint32_t t = led.phase;
     uint8_t new_bright = led.current_bright;
 
     switch (led.mode) {
         case LED_MODE_OFF:
         case LED_MODE_ON:
-            // ничего не делаем
             break;
 
         case LED_MODE_BLINK:
-            // прямоугольные импульсы: половина периода вкл, половина выкл
             new_bright = (t < led.period_us / 2) ? led.max_bright : led.min_bright;
             break;
 
         case LED_MODE_BREATHE: {
             uint32_t half = led.period_us / 2;
             if (t < half) {
-                uint32_t progress = (t * 255) / half;   // 0..255
-                new_bright = (uint8_t)(led.min_bright + (led.max_bright - led.min_bright) * progress / 255);
+                uint32_t progress = (t * 255) / half;
+                new_bright = (uint8_t)(led.min_bright +
+                              (led.max_bright - led.min_bright) * progress / 255);
             } else {
                 uint32_t progress = ((t - half) * 255) / half;
-                new_bright = (uint8_t)(led.max_bright - (led.max_bright - led.min_bright) * progress / 255);
+                new_bright = (uint8_t)(led.max_bright -
+                              (led.max_bright - led.min_bright) * progress / 255);
             }
             break;
         }
 
         case LED_MODE_FADE_IN:
-            // линейное нарастание от min до max в течение периода
-            new_bright = (uint8_t)(led.min_bright + (led.max_bright - led.min_bright) * t / led.period_us);
+            new_bright = (uint8_t)(led.min_bright +
+                          (led.max_bright - led.min_bright) * t / led.period_us);
             break;
 
         case LED_MODE_FADE_OUT:
-            // линейное затухание от max до min в течение периода
-            new_bright = (uint8_t)(led.max_bright - (led.max_bright - led.min_bright) * t / led.period_us);
+            new_bright = (uint8_t)(led.max_bright -
+                          (led.max_bright - led.min_bright) * t / led.period_us);
             break;
 
         default:
@@ -170,10 +158,65 @@ static void pwm_proc(void) {
     }
 }
 
-// Public interface
-const pwm_led_t pwm_led = {
-    .init = pwm_init,
-    .set_mode = pwm_set_mode,
-    .set_brightness = pwm_set_brightness,
-    .proc = pwm_proc
+// Реализация интерфейса drv_face_t
+
+static int pwm_led_read(void *buf, size_t len) {
+    if (len < 1) return -EINVAL;
+    *(uint8_t*)buf = led.current_bright;
+    return 1;
+}
+
+static int pwm_led_write(const void *buf, size_t len) {
+    if (len < 1) return -EINVAL;
+    pwm_set_brightness(*(const uint8_t*)buf);
+    return 1;
+}
+
+static int pwm_led_ioctl(int cmd, void *arg) {
+    switch (cmd) {
+        case INTERFACE_INIT:
+            pwm_init_hw();
+            pwm_set_brightness(0);
+            led.mode = LED_MODE_OFF;
+            led.last_update = micros();
+            led.phase = 0;
+            return 0;
+
+        case INTERFACE_DEINIT:
+            // Выключение таймера и сброс GPIO (опционально)
+            TIM2->CR1 &= ~TIM_CR1_CEN;
+            GPIOA->MODER &= ~GPIO_MODER_MODER1; // вернуть в аналоговый/вход
+            return 0;
+
+        case INTERFACE_GET_PROC:
+            *(void(**)(void))arg = pwm_proc;
+            return 0;
+
+        case PWM_LED_CMD_SET_BRIGHTNESS: {
+            const pwm_led_set_brightness_t *p = arg;
+            pwm_set_brightness(p->brightness);
+            return 0;
+        }
+
+        case PWM_LED_CMD_SET_MODE: {
+            const pwm_led_set_mode_t *p = arg;
+            pwm_set_mode(p->mode, p->period_ms, p->min_bright, p->max_bright);
+            return 0;
+        }
+
+        default:
+            return -ENOTSUP;
+    }
+}
+
+// Экспортируемый экземпляр драйвера
+const drv_face_t pwm_led_dev = {
+    .read = pwm_led_read,
+    .write = pwm_led_write,
+    .ioctl = pwm_led_ioctl
 };
+
+const drv_face_t* dev_pwm_led_get(void)
+{
+    return (const drv_face_t*) &pwm_led_dev;
+}

@@ -22,10 +22,12 @@ int main(void)
     char *uart_ver = 0;
     drv_face_t* uart = 0;
 
-
     us_init();
 
-    pwm_led.init();
+    drv_face_t* led = dev_pwm_led_get();
+    led->ioctl(INTERFACE_INIT, NULL);
+    void (*led_proc)(void) = NULL;
+    led->ioctl(INTERFACE_GET_PROC, &led_proc);
 
     // set driver over SVC
     fc_drv_table_set(&dev_uart1, 0);
@@ -49,8 +51,9 @@ int main(void)
     
     printf("micros: %ld\r\n", micros());
     
-    pwm_led.set_mode(LED_MODE_BREATHE, 1000, 25, 255);
-    
+    // Установка режима дыхания
+    pwm_led_set_mode(led, LED_MODE_BREATHE, 2000, 10, 200);
+
     drv_face_t* w25q =  dev_w25q_get();
     w25q->ioctl(INTERFACE_INIT, NULL);
 
@@ -59,7 +62,7 @@ int main(void)
     while (1)
     {
         ucmd_default_proc();
-        pwm_led.proc();
+        led_proc();
         for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
     }
 }

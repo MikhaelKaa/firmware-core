@@ -13,6 +13,7 @@
 #define INTERFACE_GET_INFO   0x1000 /* Get device info */
 #define INTERFACE_INIT       0x1001 /* Init device */
 #define INTERFACE_DEINIT     0x1002 /* Deinit device */
+#define INTERFACE_GET_PROC   0x1003 /* Get proc func device */
 
 /* Device-specific command space */
 #define INTERFACE_CMD_DEVICE 0x2000 /* Base for device-specific commands */
