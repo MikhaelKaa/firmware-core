@@ -47,6 +47,10 @@ C_INCLUDES += -Iapp/micros
 C_SOURCES += app/led/ucmd_led.c
 C_INCLUDES += -Iapp/led
 
+# App w25q
+C_SOURCES += app/w25q/ucmd_w25q.c
+C_INCLUDES += -Iapp/w25q
+
 #######################################
 # binaries
 #######################################

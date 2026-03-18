@@ -12,6 +12,7 @@
 #include "rtc_time.h"
 #include "micros.h"
 #include "pwm_led.h"
+#include "w25q.h"
 
 extern const drv_face_t dev_uart1;
 
@@ -50,6 +51,9 @@ int main(void)
     
     pwm_led.set_mode(LED_MODE_BREATHE, 1000, 25, 255);
     
+    drv_face_t* w25q =  dev_w25q_get();
+    w25q->ioctl(INTERFACE_INIT, NULL);
+
     ucmd_default_init();
 
     while (1)

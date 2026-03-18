@@ -10,6 +10,7 @@
 #include "memory_man.h"
 #include "ucmd_time.h"
 #include "ucmd_led.h"
+#include "ucmd_w25q.h"
 
 int ucmd_parse(command_t cmd_list[], int argc, const char **argv)
 {
@@ -64,6 +65,11 @@ command_t cmd_list[] = {
     .cmd  = "led",
     .help = "led PA1 ctrl",
     .fn   = ucmd_led,
+  },
+  {
+    .cmd  = "w25q",
+    .help = "w25q ctrl",
+    .fn   = ucmd_w25q,
   },
   {0}, // null list terminator DON'T FORGET THIS!
 };
