@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* Copyright 2025 Michael Kaa */
+/* Copyright 2026 Michael Kaa */
 
 #include <string.h>
 #include <errno.h>
@@ -35,6 +35,10 @@ static volatile uint32_t rx_write_pos = 0;
 static volatile uint8_t tx_in_progress = 0;
 static volatile uint32_t tx_complete_flag = 0;
 
+// Callback for RX idle detection
+static void (*uart1_idle_callback)(void) = NULL;
+
+
 static int uart_available(void);
 
 // Open UART (interface implementation)
@@ -57,7 +61,7 @@ static int uart_init(void) {
     
     // Configure USART1 - 115200 baud at 84MHz
     USART1->BRR = (84000000 + 115200 / 2) / 115200; //TODO: Variable baudrate, CLK
-    USART1->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;
+    USART1->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE | USART_CR1_IDLEIE; // Added IDLEIE
     USART1->CR3 = USART_CR3_DMAT | USART_CR3_DMAR;
     USART1->CR1 |= USART_CR1_UE;
     
@@ -117,21 +121,6 @@ static int uart_deinit(void) {
     return 0;  // Success
 }
 
-// Функция проверки буфера 
-// static int is_dma_safe_buffer(const void *buf) {
-//     uint32_t addr = (uint32_t)buf;
-    
-//     // Проверяем выравнивание (4 байта)
-//     if (addr & 0x3) return 0;
-    
-//     // Проверяем, что буфер в DMA-доступной области памяти
-//     // (зависит от конкретного МК и linker script)
-//     if (addr >= 0x20000000 && addr < 0x20020000) return 1;
-    
-//     return 0;
-// }
-
-
 // Write data to UART (interface implementation)
 static int uart_write(const void *buf, size_t count) {
     if (buf == NULL || count == 0) {
@@ -152,18 +141,6 @@ static int uart_write(const void *buf, size_t count) {
         return -ETIMEDOUT;
     }
     
-
-    // // Проверяем, можно ли использовать буфер напрямую
-    // if (is_dma_safe_buffer(buf)) {
-    //     // Используем внешний буфер напрямую - БЕЗ КОПИРОВАНИЯ
-    //     DMA2_Stream7->M0AR = (uint32_t)buf;
-    // } else {
-    //     // Копируем в безопасный буфер
-    //     memcpy(tx_buffer, buf, count);
-    //     DMA2_Stream7->M0AR = (uint32_t)tx_buffer;
-    // }
-
-
     // Copy data to buffer
     memcpy(tx_buffer, buf, count);
     tx_in_progress = 1;
@@ -236,6 +213,18 @@ static int uart_ioctl(int cmd, void *arg) {
             }
             return -EINVAL;
 
+        case UART_SET_RX_IDLE_CALLBACK:
+            {
+                // Используем union для преобразования void* в указатель на функцию
+                union {
+                    void (*func)(void);
+                    void *ptr;
+                } cast;
+                cast.ptr = arg;
+                uart1_idle_callback = cast.func;
+            }
+            return 0;
+
         default:
             return -ENOTSUP;  // Command not supported
     }
@@ -255,11 +244,17 @@ const drv_face_t* dev_uart1_get(void)
 
 // USART1 Interrupt Handler
 void USART1_IRQHandler(void) {
-    // RXNE interrupt - data received
-    if (USART1->SR & USART_SR_RXNE) {
-        volatile uint8_t data = (uint8_t)USART1->DR;  // Read to clear flag
-        (void)data;  // Suppress unused warning
-        // Data is handled by DMA, this is just for flag clearing
+    uint32_t sr = USART1->SR;
+    
+    // RXNE interrupt - data received (handled by DMA)
+    if (sr & USART_SR_RXNE) {
+        (void)USART1->DR;  // Read to clear flag
+    }
+    
+    // IDLE line detected - end of packet
+    if (sr & USART_SR_IDLE) {
+        (void)USART1->DR;  // Read to clear IDLE flag
+        if (uart1_idle_callback) uart1_idle_callback();
     }
 }
 

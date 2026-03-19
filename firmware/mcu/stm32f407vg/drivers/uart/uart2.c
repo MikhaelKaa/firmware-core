@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* Copyright 2025 Michael Kaa */
+/* Copyright 2026 Michael Kaa */
 
 #include <string.h>
 #include <errno.h>
@@ -35,6 +35,9 @@ static volatile uint32_t tx_complete_flag = 0;
 // Driver version
 const char *dev_uart2_version = "stm32f407vgt6 uart2; PA2-TX, PA3-RX; 115200n1; hardcode ver 0.0.0";
 
+// Callback for RX idle detection
+static void (*uart2_idle_callback)(void) = NULL;
+
 static int uart_available(void);
 
 // Open UART2 (interface implementation)
@@ -57,7 +60,7 @@ static int uart_init(void) {
     
     // Configure USART2 - 115200 baud at 42MHz (APB1 = 42MHz)
     USART2->BRR = (42000000 + 115200 / 2) / 115200;
-    USART2->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;
+    USART2->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE | USART_CR1_IDLEIE; // Added IDLEIE
     USART2->CR3 = USART_CR3_DMAT | USART_CR3_DMAR;
     USART2->CR1 |= USART_CR1_UE;
     
@@ -208,10 +211,19 @@ static int uart_ioctl(int cmd, void *arg) {
                 *(const char **)arg = dev_uart2_version;
                 return 0;
             }
-            return -EINVAL;       
-            
-        // case UART_FLUSH:
-        //     return uart_flush();
+            return -EINVAL;
+
+        case UART_SET_RX_IDLE_CALLBACK:
+            {
+                // Используем union для преобразования void* в указатель на функцию
+                union {
+                    void (*func)(void);
+                    void *ptr;
+                } cast;
+                cast.ptr = arg;
+                uart2_idle_callback = cast.func;
+            }
+            return 0;
             
         default:
             return -ENOTSUP;  // Command not supported
@@ -223,17 +235,24 @@ const drv_face_t dev_uart2 = {.read = uart_read, .write = uart_write, .ioctl = u
 
 const drv_face_t* dev_uart2_get(void)
 {
-    // return (const drv_face_t*)&dev_uart2;
     return &dev_uart2;
 }
 
 // USART2 Interrupt Handler
 void USART2_IRQHandler(void) {
-    // RXNE interrupt - data received
-    if (USART2->SR & USART_SR_RXNE) {
-        volatile uint8_t data = (uint8_t)USART2->DR;  // Read to clear flag
-        (void)data;  // Suppress unused warning
-        // Data is handled by DMA, this is just for flag clearing
+    uint32_t sr = USART2->SR;
+
+    // RXNE interrupt - data received (handled by DMA)
+    if (sr & USART_SR_RXNE) {
+        (void)USART2->DR;  // Read to clear flag
+    }
+
+    // IDLE line detected - end of packet
+    if (sr & USART_SR_IDLE) {
+        (void)USART2->DR;  // Read to clear IDLE flag
+        if (uart2_idle_callback) {
+            uart2_idle_callback();
+        }
     }
 }
 
