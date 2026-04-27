@@ -13,6 +13,7 @@
 #include "micros.h"
 #include "pwm_led.h"
 #include "w25q.h"
+#include "usb_cdc.h"
 
 extern const drv_face_t dev_uart1;
 
@@ -56,6 +57,11 @@ int main(void)
 
     drv_face_t* w25q =  dev_w25q_get();
     w25q->ioctl(INTERFACE_INIT, NULL);
+
+    // Initialize USB CDC
+    const drv_face_t* usb_cdc = dev_usb_cdc_get();
+    usb_cdc->ioctl(INTERFACE_INIT, NULL);
+    printf("USB CDC initialized\r\n");
 
     ucmd_default_init();
 
