@@ -21,6 +21,7 @@ typedef struct {
     uint32_t rxflvl_count;
     uint32_t address_set;
     uint32_t ep0_in_xfrc;
+    uint32_t multi_packet;
     uint8_t last_setup[8];
 } usb_cdc_debug_stats_t;
 

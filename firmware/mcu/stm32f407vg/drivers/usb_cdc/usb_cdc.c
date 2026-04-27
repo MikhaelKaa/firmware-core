@@ -70,6 +70,7 @@ static volatile uint32_t debug_setup_count = 0;
 static volatile uint32_t debug_rxflvl_count = 0;
 static volatile uint32_t debug_address_set = 0;
 static volatile uint32_t debug_ep0_in_xfrc = 0;
+static volatile uint32_t debug_multi_packet = 0;
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -476,6 +477,7 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->rxflvl_count = debug_rxflvl_count;
                 stats->address_set = debug_address_set;
                 stats->ep0_in_xfrc = debug_ep0_in_xfrc;
+                stats->multi_packet = debug_multi_packet;
                 memcpy(stats->last_setup, last_setup_packet, 8);
             }
             return 0;
@@ -662,6 +664,7 @@ void OTG_FS_IRQHandler(void) {
                     
                     if (ep0_tx_len > 0) {
                         // Send next chunk
+                        debug_multi_packet++;
                         uint16_t pkt = (ep0_tx_len > 64) ? 64 : ep0_tx_len;
                         USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
                         USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;

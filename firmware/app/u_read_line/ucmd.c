@@ -52,6 +52,7 @@ int ucmd_usb(int argc, char **argv) {
   printf("  RXFLVL: %lu\r\n", stats.rxflvl_count);
   printf("  ADDR_SET: %lu\r\n", stats.address_set);
   printf("  EP0_IN_XFRC: %lu\r\n", stats.ep0_in_xfrc);
+  printf("  MULTI_PKT: %lu\r\n", stats.multi_packet);
   printf("  Last SETUP: %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
          stats.last_setup[0], stats.last_setup[1], stats.last_setup[2], stats.last_setup[3],
          stats.last_setup[4], stats.last_setup[5], stats.last_setup[6], stats.last_setup[7]);
