@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdio.h>
 
 #include "usb_cdc.h"
 #include "usb_desc.h"
@@ -144,6 +145,8 @@ static void usb_handle_setup(void) {
     uint16_t wValue = setup_packet[2] | (setup_packet[3] << 8);
     uint16_t wLength = setup_packet[6] | (setup_packet[7] << 8);
     
+    printf("[S:%02x.%02x.%04x]", req_type, req, wValue);
+    
     if ((req_type & 0x60) == 0x00) { // Standard request
         if (req == USB_REQ_GET_DESCRIPTOR) {
             uint8_t desc_type = wValue >> 8;
@@ -161,11 +164,13 @@ static void usb_handle_setup(void) {
             }
         } else if (req == USB_REQ_SET_ADDRESS) {
             uint8_t addr = wValue & 0x7F;
+            printf("[ADDR:%d]", addr);
             usb_ep0_transmit(NULL, 0); // Status stage
             // Set address after status stage
             USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (addr << 4);
             usb_state = USB_STATE_ADDRESSED;
         } else if (req == USB_REQ_SET_CONFIGURATION) {
+            printf("[CFG]");
             usb_configured = 1;
             usb_state = USB_STATE_CONFIGURED;
             usb_ep0_transmit(NULL, 0); // Status stage
@@ -462,7 +467,7 @@ void OTG_FS_IRQHandler(void) {
     if (gintsts & USB_OTG_GINTSTS_USBRST) {
         USBx->GINTSTS = USB_OTG_GINTSTS_USBRST;
         
-        // Debug: signal reset received
+        printf("[RST]");
         GPIOA->ODR ^= (1 << 1); // Toggle PA1 (LED)
         
         // Reset device state
@@ -527,17 +532,20 @@ void OTG_FS_IRQHandler(void) {
         // Set EP0 max packet size to 64
         USBx_INEP(0)->DIEPCTL &= ~USB_OTG_DIEPCTL_MPSIZ;
         USBx_DEVICE->DCTL |= USB_OTG_DCTL_CGINAK;
+        return;
     }
     
-    // RX FIFO non-empty
+    // RX FIFO non-empty - MUST be processed first
     if (gintsts & USB_OTG_GINTSTS_RXFLVL) {
         uint32_t grxsts = USBx->GRXSTSP;
         uint8_t epnum = grxsts & 0xF;
         uint16_t count = (grxsts >> 4) & 0x7FF;
         uint8_t pktsts = (grxsts >> 17) & 0xF;
         
-        if (pktsts == 6 && epnum == 0) { // SETUP packet
+        if (pktsts == 6 && epnum == 0) { // SETUP packet data
             usb_read_fifo(setup_packet, 8);
+        } else if (pktsts == 4 && epnum == 0) { // SETUP complete
+            usb_handle_setup();
         } else if (pktsts == 2 && count > 0) { // OUT packet
             if (epnum == 1) {
                 // EP1 OUT - CDC data
@@ -555,6 +563,42 @@ void OTG_FS_IRQHandler(void) {
                 }
             }
         }
+        // Don't return - continue to process OEPINT
+    }
+    
+    // OUT endpoint interrupt - process before IN
+    if (gintsts & USB_OTG_GINTSTS_OEPINT) {
+        USBx->GINTSTS = USB_OTG_GINTSTS_OEPINT;
+        uint32_t ep_intr = (USBx_DEVICE->DAINT >> 16) & 0xFFFF;
+        
+        if (ep_intr & 0x1) { // EP0 OUT
+            uint32_t doepint = USBx_OUTEP(0)->DOEPINT;
+            
+            if (doepint & USB_OTG_DOEPINT_STUP) {
+                // SETUP packet received
+                usb_handle_setup();
+                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_STUP;
+            }
+            
+            if (doepint & USB_OTG_DOEPINT_XFRC) {
+                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_XFRC;
+                // Re-enable EP0 OUT
+                USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
+            }
+        }
+        
+        if (ep_intr & 0x2) { // EP1 OUT
+            uint32_t doepint = USBx_OUTEP(1)->DOEPINT;
+            
+            if (doepint & USB_OTG_DOEPINT_XFRC) {
+                USBx_OUTEP(1)->DOEPINT = USB_OTG_DOEPINT_XFRC;
+                
+                // Re-enable for next reception
+                USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
+                USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
+            }
+        }
+        return;
     }
     
     // IN endpoint interrupt
@@ -585,41 +629,6 @@ void OTG_FS_IRQHandler(void) {
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(1)->DIEPINT = USB_OTG_DIEPINT_XFRC;
                 tx_in_progress = 0;
-            }
-        }
-        return;
-    }
-    
-    // OUT endpoint interrupt
-    if (gintsts & USB_OTG_GINTSTS_OEPINT) {
-        USBx->GINTSTS = USB_OTG_GINTSTS_OEPINT;
-        uint32_t ep_intr = (USBx_DEVICE->DAINT >> 16) & 0xFFFF;
-        
-        if (ep_intr & 0x1) { // EP0 OUT
-            uint32_t doepint = USBx_OUTEP(0)->DOEPINT;
-            
-            if (doepint & USB_OTG_DOEPINT_STUP) {
-                // SETUP packet received
-                usb_handle_setup();
-                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_STUP;
-            }
-            
-            if (doepint & USB_OTG_DOEPINT_XFRC) {
-                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_XFRC;
-                // Re-enable EP0 OUT
-                USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
-            }
-        }
-        
-        if (ep_intr & 0x2) { // EP1 OUT
-            uint32_t doepint = USBx_OUTEP(1)->DOEPINT;
-            
-            if (doepint & USB_OTG_DOEPINT_XFRC) {
-                USBx_OUTEP(1)->DOEPINT = USB_OTG_DOEPINT_XFRC;
-                
-                // Re-enable for next reception
-                USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
-                USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
         }
         return;
