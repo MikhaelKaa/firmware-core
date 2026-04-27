@@ -68,6 +68,8 @@ static volatile uint16_t control_line_state = 0;
 static volatile uint32_t debug_reset_count = 0;
 static volatile uint32_t debug_setup_count = 0;
 static volatile uint32_t debug_rxflvl_count = 0;
+static volatile uint32_t debug_address_set = 0;
+static volatile uint32_t debug_ep0_in_xfrc = 0;
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -452,6 +454,8 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->reset_count = debug_reset_count;
                 stats->setup_count = debug_setup_count;
                 stats->rxflvl_count = debug_rxflvl_count;
+                stats->address_set = debug_address_set;
+                stats->ep0_in_xfrc = debug_ep0_in_xfrc;
                 memcpy(stats->last_setup, last_setup_packet, 8);
             }
             return 0;
@@ -558,8 +562,7 @@ void OTG_FS_IRQHandler(void) {
         
         if (pktsts == 6 && epnum == 0) { // SETUP packet data in FIFO
             usb_read_fifo(setup_packet, 8);
-        } else if (pktsts == 4 && epnum == 0) { // SETUP complete
-            usb_handle_setup();
+            usb_handle_setup(); // Handle immediately
         } else if (pktsts == 2 && count > 0) { // OUT packet
             if (epnum == 1) {
                 // EP1 OUT - CDC data
@@ -629,12 +632,14 @@ void OTG_FS_IRQHandler(void) {
             
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
+                debug_ep0_in_xfrc++;
                 
                 // Set address if pending
                 if (pending_address) {
                     USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (pending_address << 4);
                     usb_state = (pending_address != 0) ? USB_STATE_ADDRESSED : USB_STATE_DEFAULT;
                     pending_address = 0;
+                    debug_address_set++;
                 }
                 
                 if (ep0_state == 1 && ep0_tx_len > 64) {
@@ -644,6 +649,9 @@ void OTG_FS_IRQHandler(void) {
                     usb_ep0_transmit(ep0_tx_ptr, ep0_tx_len);
                 } else {
                     ep0_state = 0;
+                    // Prepare EP0 OUT for next SETUP
+                    USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
+                    USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
                 }
             }
         }
