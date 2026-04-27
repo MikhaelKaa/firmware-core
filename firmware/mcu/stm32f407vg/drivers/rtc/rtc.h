@@ -7,8 +7,10 @@
 #include "drv_face.h"
 #include <stdint.h>
 
+// Магическое число для RTC
 extern const uint32_t rtc_magic_number;
 
+// Инициализация RTC
 void RTC_init(void);
 
 #endif /* DEV_RTC_H */

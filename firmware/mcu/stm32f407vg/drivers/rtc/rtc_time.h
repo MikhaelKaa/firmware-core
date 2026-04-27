@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2025 Michael Kaa */
-// RTC time/date functions for stm32f407
+// Функции для работы с временем и датой RTC
 
 #ifndef RTC_TIME_H
 #define RTC_TIME_H
@@ -28,10 +28,10 @@ typedef struct {
 // Проверка инициализации RTC
 uint8_t RTC_is_initialized(void);
 
-// Установка даты и времени
+// Установка даты и времени в RTC
 void RTC_set_date_time(const rtc_date_time_t *dt);
 
-// Получение текущей даты и времени
+// Получение текущей даты и времени из RTC
 void RTC_get_date_time(rtc_date_time_t *dt);
 
 #ifdef __cplusplus

@@ -1,4 +1,3 @@
-
 #ifndef DWT_MICROS
 #define DWT_MICROS
 
@@ -6,6 +5,7 @@
 
 extern uint32_t system_core_clock;
 
+// Инициализация микросекундного счетчика
 static inline void us_init(void)
 {
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // Разрешаем использовать счётчик.
@@ -13,9 +13,8 @@ static inline void us_init(void)
     DWT->CTRL        |= DWT_CTRL_CYCCNTENA_Msk;     // Запускаем счётчик.
 }
 
-static inline  void delay_us(uint32_t us) {
-    // На первый взгляд работает. Точных замеров не делал, 
-    // наверное стоит добавить калибровочные значения.
+// Функция задержки на определенное количество микросекунд
+static inline void delay_us(uint32_t us) {
     uint32_t us_count_tick = (uint32_t)((uint64_t)us * system_core_clock / 1000000U);
     uint32_t start_tick = DWT->CYCCNT;
     
@@ -23,14 +22,14 @@ static inline  void delay_us(uint32_t us) {
     while ((DWT->CYCCNT - start_tick) < us_count_tick);
 }
  
-static inline  uint32_t micros(void) {
-    return  DWT->CYCCNT / (system_core_clock / 1000000U);
+// Функция получения текущего значения микросекундного счетчика
+static inline uint32_t micros(void) {
+    return DWT->CYCCNT / (system_core_clock / 1000000U);
 }
 
-// TODO: test me
-static inline  uint32_t millis(void) {
-    return  DWT->CYCCNT / (system_core_clock / 1000000U) / 1000U;
+// Функция получения текущего значения миллисекундного счетчика
+static inline uint32_t millis(void) {
+    return DWT->CYCCNT / (system_core_clock / 1000000U) / 1000U;
 }
-
 
 #endif /* DWT_MICROS */

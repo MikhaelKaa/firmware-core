@@ -9,24 +9,23 @@
 #include <errno.h>
 #include <stdio.h>
 
-/* Common ioctl commands */
-#define INTERFACE_GET_INFO   0x1000 /* Get device info */
-#define INTERFACE_INIT       0x1001 /* Init device */
-#define INTERFACE_DEINIT     0x1002 /* Deinit device */
-#define INTERFACE_GET_PROC   0x1003 /* Get proc func device */
+// Общие команды ioctl
+#define INTERFACE_GET_INFO   0x1000 /* Получение информации о устройстве */
+#define INTERFACE_INIT       0x1001 /* Инициализация устройства */
+#define INTERFACE_DEINIT     0x1002 /* Деинициализация устройства */
+#define INTERFACE_GET_PROC   0x1003 /* Получение функции обработки устройства */
 
-/* Device-specific command space */
-#define INTERFACE_CMD_DEVICE 0x2000 /* Base for device-specific commands */
-
+// База для команд, специфичных для устройства
+#define INTERFACE_CMD_DEVICE 0x2000 /* Базовый номер для устройствозависимых команд */
 
 /**
- * struct drv_face - Unified device interface
- * @read:  Read data from device
- * @write: Write data to device
- * @ioctl: Device control and configuration
+ * struct drv_face - Общий интерфейс устройства
+ * @read:  Чтение данных из устройства
+ * @write: Запись данных в устройство
+ * @ioctl: Управление и конфигурация устройства
  *
- * Generic interface for all device types in the system.
- * Functions should return 0 on success or negative errno on error.
+ * Общий интерфейс для всех типов устройств в системе.
+ * Функции должны возвращать 0 при успехе или отрицательное значение errno при ошибке.
  */
 typedef struct drv_face
 {
@@ -35,16 +34,10 @@ typedef struct drv_face
     int (*ioctl)(int cmd, void* arg);
 } drv_face_t;
 
-/// @brief 
-/// @param dev 
-/// @param pos 
-/// @return 
+// Установка устройства в таблицу драйверов
 ssize_t drv_table_set(const drv_face_t* dev, unsigned int pos);
 
-/// @brief 
-/// @param dev 
-/// @param pos 
-/// @return 
+// Получение устройства из таблицы драйверов
 ssize_t drv_table_get(drv_face_t** dev, unsigned int pos);
 
 #endif /* _DRV_FACE_H */

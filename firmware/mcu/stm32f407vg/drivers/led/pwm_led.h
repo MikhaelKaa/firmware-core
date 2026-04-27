@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "drv_face.h"
 
-// Режимы работы светодиода (оставлены как в оригинале)
+// Режимы работы светодиода
 typedef enum {
     LED_MODE_OFF,
     LED_MODE_ON,
@@ -21,27 +21,29 @@ typedef enum {
 
 // Структуры параметров для команд
 typedef struct {
-    uint8_t brightness;   // 0..255
+    uint8_t brightness;   // Яркость светодиода (0..255)
 } pwm_led_set_brightness_t;
 
 typedef struct {
     led_mode_t mode;
-    uint16_t period_ms;   // период в миллисекундах (для режимов BLINK, BREATHE, FADE_IN, FADE_OUT)
-    uint8_t min_bright;   // минимальная яркость (0..255)
-    uint8_t max_bright;   // максимальная яркость (0..255)
+    uint16_t period_ms;   // Период в миллисекундах для режимов BLINK, BREATHE, FADE_IN, FADE_OUT
+    uint8_t min_bright;   // Минимальная яркость (0..255)
+    uint8_t max_bright;   // Максимальная яркость (0..255)
 } pwm_led_set_mode_t;
 
-// Экземпляр драйвера (реализован в pwm_led_drv.c)
-extern const drv_face_t pwm_led_dev; // TODO: и так и так можно, надо выбрать единый стиль и подход.
+// Экземпляр драйвера PWM LED
+extern const drv_face_t pwm_led_dev;
 const drv_face_t* dev_pwm_led_get(void);
 
 // Удобные inline-обёртки для вызова ioctl
 
+// Установка яркости светодиода
 static inline int pwm_led_set_brightness(drv_face_t *dev, uint8_t brightness) {
     return dev->ioctl(PWM_LED_CMD_SET_BRIGHTNESS,
                       &(pwm_led_set_brightness_t){.brightness = brightness});
 }
 
+// Установка режима работы светодиода
 static inline int pwm_led_set_mode(drv_face_t *dev,
                                    led_mode_t mode,
                                    uint16_t period_ms,
