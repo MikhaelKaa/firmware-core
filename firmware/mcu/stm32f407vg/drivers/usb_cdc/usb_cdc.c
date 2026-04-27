@@ -168,16 +168,6 @@ static void usb_handle_setup(void) {
         } else if (req == USB_REQ_SET_CONFIGURATION) {
             usb_configured = 1;
             usb_state = USB_STATE_CONFIGURED;
-            
-            // Open CDC endpoints
-            usb_ep_open(0x81, 2, 64); // EP1 IN (Bulk)
-            usb_ep_open(0x01, 2, 64); // EP1 OUT (Bulk)
-            usb_ep_open(0x83, 3, 8);  // EP3 IN (Interrupt)
-            
-            // Prepare EP1 OUT for reception
-            USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
-            USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
-            
             usb_ep0_transmit(NULL, 0); // Status stage
         } else {
             usb_ep0_transmit(NULL, 0); // ACK
@@ -260,6 +250,12 @@ static void usb_device_init(void) {
     
     // TX1 FIFO: 64 words at offset 192
     USBx->DIEPTXF[0] = (64 << 16) | 192;
+    
+    // TX2 FIFO: 16 words at offset 256 (for EP3 interrupt)
+    USBx->DIEPTXF[1] = (16 << 16) | 256;
+    
+    // TX2 FIFO: 16 words at offset 256 (for EP3 interrupt)
+    USBx->DIEPTXF[1] = (16 << 16) | 256;
     
     // Enable interrupts
     USBx->GINTMSK = USB_OTG_GINTMSK_USBRST | 
@@ -460,7 +456,7 @@ const drv_face_t* dev_usb_cdc_get(void)
 
 // USB OTG FS Interrupt Handler
 void OTG_FS_IRQHandler(void) {
-    uint32_t gintsts = USBx->GINTSTS & USBx->GINTMSK;
+    uint32_t gintsts = USBx->GINTSTS;
     
     // USB Reset
     if (gintsts & USB_OTG_GINTSTS_USBRST) {
@@ -474,17 +470,54 @@ void OTG_FS_IRQHandler(void) {
         usb_configured = 0;
         ep0_state = 0;
         
+        // Clear all interrupts
+        USBx->GINTSTS = 0xFFFFFFFF;
+        
+        // Set device address to 0
+        USBx_DEVICE->DCFG &= ~USB_OTG_DCFG_DAD;
+        
+        // Flush FIFOs
+        USBx->GRSTCTL = USB_OTG_GRSTCTL_TXFFLSH | (0x10 << 6);
+        while (USBx->GRSTCTL & USB_OTG_GRSTCTL_TXFFLSH);
+        
+        USBx->GRSTCTL = USB_OTG_GRSTCTL_RXFFLSH;
+        while (USBx->GRSTCTL & USB_OTG_GRSTCTL_RXFFLSH);
+        
+        // Enable endpoint interrupts for EP0, EP1
+        USBx_DEVICE->DAINTMSK = 0x30003; // EP0 IN/OUT, EP1 IN/OUT, EP3 IN
+        USBx_DEVICE->DOEPMSK = USB_OTG_DOEPMSK_STUPM | USB_OTG_DOEPMSK_XFRCM;
+        USBx_DEVICE->DIEPMSK = USB_OTG_DIEPMSK_XFRCM;
+        
         // Open EP0
         USBx_INEP(0)->DIEPCTL = USB_OTG_DIEPCTL_USBAEP | USB_OTG_DIEPCTL_SNAK;
         USBx_OUTEP(0)->DOEPCTL = USB_OTG_DOEPCTL_USBAEP;
         
-        USBx_DEVICE->DAINTMSK = 0x10001; // EP0 IN/OUT
-        USBx_DEVICE->DOEPMSK = USB_OTG_DOEPMSK_STUPM | USB_OTG_DOEPMSK_XFRCM;
-        USBx_DEVICE->DIEPMSK = USB_OTG_DIEPMSK_XFRCM;
-        
-        // Prepare for SETUP
+        // Prepare EP0 OUT for SETUP
         USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
         USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_EPENA | USB_OTG_DOEPCTL_CNAK;
+        
+        // Open EP1 IN (Bulk)
+        USBx_INEP(1)->DIEPCTL = USB_OTG_DIEPCTL_SNAK |
+                                 (1 << 22) | // TX FIFO 1
+                                 (2 << 18) | // Bulk
+                                 USB_OTG_DIEPCTL_USBAEP |
+                                 64;
+        
+        // Open EP1 OUT (Bulk)
+        USBx_OUTEP(1)->DOEPCTL = USB_OTG_DOEPCTL_CNAK |
+                                  (2 << 18) | // Bulk
+                                  USB_OTG_DOEPCTL_USBAEP |
+                                  64;
+        
+        USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
+        USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_EPENA;
+        
+        // Open EP3 IN (Interrupt)
+        USBx_INEP(3)->DIEPCTL = USB_OTG_DIEPCTL_SNAK |
+                                 (2 << 22) | // TX FIFO 2
+                                 (3 << 18) | // Interrupt
+                                 USB_OTG_DIEPCTL_USBAEP |
+                                 8;
     }
     
     // Enumeration done
@@ -498,23 +531,15 @@ void OTG_FS_IRQHandler(void) {
     
     // RX FIFO non-empty
     if (gintsts & USB_OTG_GINTSTS_RXFLVL) {
-        USBx->GINTMSK &= ~USB_OTG_GINTMSK_RXFLVLM;
-        
         uint32_t grxsts = USBx->GRXSTSP;
         uint8_t epnum = grxsts & 0xF;
         uint16_t count = (grxsts >> 4) & 0x7FF;
         uint8_t pktsts = (grxsts >> 17) & 0xF;
         
-        if (pktsts == 6) { // SETUP packet
+        if (pktsts == 6 && epnum == 0) { // SETUP packet
             usb_read_fifo(setup_packet, 8);
-            ep0_state = 0;
-        } else if (pktsts == 2) { // OUT packet
-            if (epnum == 0 && count > 0) {
-                // EP0 OUT data (e.g., SET_LINE_CODING data)
-                uint8_t temp[64];
-                usb_read_fifo(temp, count);
-                usb_ep0_transmit(NULL, 0); // Status stage
-            } else if (epnum == 1 && count > 0) {
+        } else if (pktsts == 2 && count > 0) { // OUT packet
+            if (epnum == 1) {
                 // EP1 OUT - CDC data
                 uint8_t temp[64];
                 usb_read_fifo(temp, count);
@@ -529,16 +554,13 @@ void OTG_FS_IRQHandler(void) {
                     usb_cdc_rx_callback();
                 }
             }
-        } else if (pktsts == 4) { // SETUP complete
-            usb_handle_setup();
         }
-        
-        USBx->GINTMSK |= USB_OTG_GINTMSK_RXFLVLM;
     }
     
     // IN endpoint interrupt
     if (gintsts & USB_OTG_GINTSTS_IEPINT) {
-        uint32_t ep_intr = (USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) & 0xFFFF;
+        USBx->GINTSTS = USB_OTG_GINTSTS_IEPINT;
+        uint32_t ep_intr = USBx_DEVICE->DAINT & 0xFFFF;
         
         if (ep_intr & 0x1) { // EP0 IN
             uint32_t diepint = USBx_INEP(0)->DIEPINT;
@@ -565,21 +587,27 @@ void OTG_FS_IRQHandler(void) {
                 tx_in_progress = 0;
             }
         }
+        return;
     }
     
     // OUT endpoint interrupt
     if (gintsts & USB_OTG_GINTSTS_OEPINT) {
-        uint32_t ep_intr = ((USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) >> 16) & 0xFFFF;
+        USBx->GINTSTS = USB_OTG_GINTSTS_OEPINT;
+        uint32_t ep_intr = (USBx_DEVICE->DAINT >> 16) & 0xFFFF;
         
         if (ep_intr & 0x1) { // EP0 OUT
             uint32_t doepint = USBx_OUTEP(0)->DOEPINT;
             
-            if (doepint & USB_OTG_DOEPINT_XFRC) {
-                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_XFRC;
+            if (doepint & USB_OTG_DOEPINT_STUP) {
+                // SETUP packet received
+                usb_handle_setup();
+                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_STUP;
             }
             
-            if (doepint & USB_OTG_DOEPINT_STUP) {
-                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_STUP;
+            if (doepint & USB_OTG_DOEPINT_XFRC) {
+                USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_XFRC;
+                // Re-enable EP0 OUT
+                USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
         }
         
@@ -589,10 +617,11 @@ void OTG_FS_IRQHandler(void) {
             if (doepint & USB_OTG_DOEPINT_XFRC) {
                 USBx_OUTEP(1)->DOEPINT = USB_OTG_DOEPINT_XFRC;
                 
-                // Prepare for next reception
+                // Re-enable for next reception
                 USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
                 USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
         }
+        return;
     }
 }
