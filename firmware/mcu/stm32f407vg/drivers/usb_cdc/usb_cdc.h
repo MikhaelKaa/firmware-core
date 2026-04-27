@@ -13,6 +13,14 @@
 #define USB_CDC_SET_RX_CALLBACK     (INTERFACE_CMD_DEVICE + 1)
 #define USB_CDC_GET_DTR             (INTERFACE_CMD_DEVICE + 2)
 #define USB_CDC_GET_RTS             (INTERFACE_CMD_DEVICE + 3)
+#define USB_CDC_GET_DEBUG_STATS     (INTERFACE_CMD_DEVICE + 4)
+
+typedef struct {
+    uint32_t reset_count;
+    uint32_t setup_count;
+    uint32_t rxflvl_count;
+    uint8_t last_setup[8];
+} usb_cdc_debug_stats_t;
 
 const drv_face_t* dev_usb_cdc_get(void);
 

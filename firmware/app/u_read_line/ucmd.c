@@ -11,6 +11,7 @@
 #include "ucmd_time.h"
 #include "ucmd_led.h"
 #include "ucmd_w25q.h"
+#include "usb_cdc.h"
 
 int ucmd_parse(command_t cmd_list[], int argc, const char **argv)
 {
@@ -36,6 +37,23 @@ int ucmd_mcu_reset(int argc, char **argv) {
   (void)(argv);
   
   NVIC_SystemReset();
+}
+
+extern const drv_face_t dev_usb_cdc;
+int ucmd_usb(int argc, char **argv) {
+  (void)(argc);
+  (void)(argv);
+  
+  usb_cdc_debug_stats_t stats;
+  dev_usb_cdc.ioctl(USB_CDC_GET_DEBUG_STATS, &stats);
+  printf("USB Debug Stats:\r\n");
+  printf("  RESET:  %lu\r\n", stats.reset_count);
+  printf("  SETUP:  %lu\r\n", stats.setup_count);
+  printf("  RXFLVL: %lu\r\n", stats.rxflvl_count);
+  printf("  Last SETUP: %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
+         stats.last_setup[0], stats.last_setup[1], stats.last_setup[2], stats.last_setup[3],
+         stats.last_setup[4], stats.last_setup[5], stats.last_setup[6], stats.last_setup[7]);
+  return 0;
 }
 
 extern command_t cmd_list[];
@@ -70,6 +88,11 @@ command_t cmd_list[] = {
     .cmd  = "w25q",
     .help = "w25q ctrl",
     .fn   = ucmd_w25q,
+  },
+  {
+    .cmd  = "usb",
+    .help = "usb debug stats",
+    .fn   = ucmd_usb,
   },
   {0}, // null list terminator DON'T FORGET THIS!
 };

@@ -64,11 +64,17 @@ static struct {
 // Control line state (DTR, RTS)
 static volatile uint16_t control_line_state = 0;
 
+// Debug counters
+static volatile uint32_t debug_reset_count = 0;
+static volatile uint32_t debug_setup_count = 0;
+static volatile uint32_t debug_rxflvl_count = 0;
+
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
 
 // SETUP packet buffer
 static uint8_t setup_packet[8];
+static uint8_t last_setup_packet[8]; // For debugging
 
 // EP0 state
 static uint8_t ep0_state = 0; // 0=IDLE, 1=DATA_IN, 2=DATA_OUT, 3=STATUS_IN, 4=STATUS_OUT
@@ -141,7 +147,8 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
 
 // Handle standard device requests
 static void usb_handle_setup(void) {
-    GPIOA->ODR ^= (1 << 1); // Toggle LED on each SETUP
+    debug_setup_count++;
+    memcpy(last_setup_packet, setup_packet, 8);
     
     uint8_t req_type = setup_packet[0];
     uint8_t req = setup_packet[1];
@@ -203,8 +210,8 @@ static void usb_core_init(void) {
     // Wait for AHB idle
     while (!(USBx->GRSTCTL & USB_OTG_GRSTCTL_AHBIDL));
     
-    // Deactivate power down
-    USBx->GCCFG = USB_OTG_GCCFG_PWRDWN;
+    // Deactivate power down and disable VBUS sensing
+    USBx->GCCFG = USB_OTG_GCCFG_PWRDWN | USB_OTG_GCCFG_NOVBUSSENS;
     
     // Force device mode, select embedded FS PHY
     USBx->GUSBCFG = USB_OTG_GUSBCFG_FDMOD | USB_OTG_GUSBCFG_PHYSEL;
@@ -439,6 +446,16 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
             }
             return 0;
 
+        case USB_CDC_GET_DEBUG_STATS:
+            if (arg != NULL) {
+                usb_cdc_debug_stats_t *stats = (usb_cdc_debug_stats_t *)arg;
+                stats->reset_count = debug_reset_count;
+                stats->setup_count = debug_setup_count;
+                stats->rxflvl_count = debug_rxflvl_count;
+                memcpy(stats->last_setup, last_setup_packet, 8);
+            }
+            return 0;
+
         default:
             return -ENOTSUP;
     }
@@ -463,8 +480,7 @@ void OTG_FS_IRQHandler(void) {
     // USB Reset
     if (gintsts & USB_OTG_GINTSTS_USBRST) {
         USBx->GINTSTS = USB_OTG_GINTSTS_USBRST;
-        
-        GPIOA->ODR ^= (1 << 1); // Toggle PA1 (LED)
+        debug_reset_count++;
         
         // Reset device state
         usb_state = USB_STATE_DEFAULT;
@@ -534,15 +550,15 @@ void OTG_FS_IRQHandler(void) {
     
     // RX FIFO non-empty - MUST be processed first
     if (gintsts & USB_OTG_GINTSTS_RXFLVL) {
+        debug_rxflvl_count++;
         uint32_t grxsts = USBx->GRXSTSP;
         uint8_t epnum = grxsts & 0xF;
         uint16_t count = (grxsts >> 4) & 0x7FF;
         uint8_t pktsts = (grxsts >> 17) & 0xF;
         
         if (pktsts == 6 && epnum == 0) { // SETUP packet data in FIFO
-            // Data is in FIFO, will be read on pktsts==4
-        } else if (pktsts == 4 && epnum == 0) { // SETUP complete
             usb_read_fifo(setup_packet, 8);
+        } else if (pktsts == 4 && epnum == 0) { // SETUP complete
             usb_handle_setup();
         } else if (pktsts == 2 && count > 0) { // OUT packet
             if (epnum == 1) {
