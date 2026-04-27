@@ -176,6 +176,9 @@ static void usb_handle_setup(void) {
                     uint8_t len = usb_string_desc[desc_index][0];
                     usb_ep0_transmit(usb_string_desc[desc_index], (wLength < len) ? wLength : len);
                 }
+            } else if (desc_type == 0x06) { // DEVICE_QUALIFIER - not supported for FS-only device
+                // STALL EP0
+                USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_STALL;
             }
         } else if (req == USB_REQ_SET_ADDRESS) {
             uint8_t addr = wValue & 0x7F;
