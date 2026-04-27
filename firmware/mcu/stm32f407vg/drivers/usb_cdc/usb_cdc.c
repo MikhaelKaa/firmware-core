@@ -51,6 +51,7 @@ static volatile uint32_t rx_write_pos = 0;
 // Transfer state
 static volatile uint8_t tx_in_progress = 0;
 static volatile uint8_t usb_configured = 0;
+static volatile uint8_t pending_address = 0;
 
 // Line coding (baudrate, stop bits, parity, data bits)
 static struct {
@@ -140,12 +141,12 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
 
 // Handle standard device requests
 static void usb_handle_setup(void) {
+    GPIOA->ODR ^= (1 << 1); // Toggle LED on each SETUP
+    
     uint8_t req_type = setup_packet[0];
     uint8_t req = setup_packet[1];
     uint16_t wValue = setup_packet[2] | (setup_packet[3] << 8);
     uint16_t wLength = setup_packet[6] | (setup_packet[7] << 8);
-    
-    printf("[S:%02x.%02x.%04x]", req_type, req, wValue);
     
     if ((req_type & 0x60) == 0x00) { // Standard request
         if (req == USB_REQ_GET_DESCRIPTOR) {
@@ -164,13 +165,9 @@ static void usb_handle_setup(void) {
             }
         } else if (req == USB_REQ_SET_ADDRESS) {
             uint8_t addr = wValue & 0x7F;
-            printf("[ADDR:%d]", addr);
-            usb_ep0_transmit(NULL, 0); // Status stage
-            // Set address after status stage
-            USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (addr << 4);
-            usb_state = USB_STATE_ADDRESSED;
+            pending_address = addr;
+            usb_ep0_transmit(NULL, 0); // Status stage - address will be set on completion
         } else if (req == USB_REQ_SET_CONFIGURATION) {
-            printf("[CFG]");
             usb_configured = 1;
             usb_state = USB_STATE_CONFIGURED;
             usb_ep0_transmit(NULL, 0); // Status stage
@@ -467,13 +464,13 @@ void OTG_FS_IRQHandler(void) {
     if (gintsts & USB_OTG_GINTSTS_USBRST) {
         USBx->GINTSTS = USB_OTG_GINTSTS_USBRST;
         
-        printf("[RST]");
         GPIOA->ODR ^= (1 << 1); // Toggle PA1 (LED)
         
         // Reset device state
         usb_state = USB_STATE_DEFAULT;
         usb_configured = 0;
         ep0_state = 0;
+        pending_address = 0;
         
         // Clear all interrupts
         USBx->GINTSTS = 0xFFFFFFFF;
@@ -542,9 +539,10 @@ void OTG_FS_IRQHandler(void) {
         uint16_t count = (grxsts >> 4) & 0x7FF;
         uint8_t pktsts = (grxsts >> 17) & 0xF;
         
-        if (pktsts == 6 && epnum == 0) { // SETUP packet data
-            usb_read_fifo(setup_packet, 8);
+        if (pktsts == 6 && epnum == 0) { // SETUP packet data in FIFO
+            // Data is in FIFO, will be read on pktsts==4
         } else if (pktsts == 4 && epnum == 0) { // SETUP complete
+            usb_read_fifo(setup_packet, 8);
             usb_handle_setup();
         } else if (pktsts == 2 && count > 0) { // OUT packet
             if (epnum == 1) {
@@ -578,11 +576,15 @@ void OTG_FS_IRQHandler(void) {
                 // SETUP packet received
                 usb_handle_setup();
                 USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_STUP;
+                // Prepare for next SETUP
+                USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
+                USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
             
             if (doepint & USB_OTG_DOEPINT_XFRC) {
                 USBx_OUTEP(0)->DOEPINT = USB_OTG_DOEPINT_XFRC;
-                // Re-enable EP0 OUT
+                // Prepare EP0 OUT for next SETUP
+                USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
                 USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
         }
@@ -611,6 +613,13 @@ void OTG_FS_IRQHandler(void) {
             
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
+                
+                // Set address if pending
+                if (pending_address) {
+                    USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (pending_address << 4);
+                    usb_state = (pending_address != 0) ? USB_STATE_ADDRESSED : USB_STATE_DEFAULT;
+                    pending_address = 0;
+                }
                 
                 if (ep0_state == 1 && ep0_tx_len > 64) {
                     // Multi-packet transfer
