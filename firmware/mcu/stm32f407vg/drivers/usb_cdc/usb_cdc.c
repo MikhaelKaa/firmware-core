@@ -133,17 +133,17 @@ static void usb_read_fifo(uint8_t *dest, uint16_t len) {
 
 // EP0 transmit
 static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
-    if (len > 64) len = 64;
+    uint16_t pkt = (len > 64) ? 64 : len;
     
     ep0_tx_ptr = data;
-    ep0_tx_len = len;
-    ep0_state = 1; // DATA_IN
+    ep0_tx_len = len;  // Save FULL length
+    ep0_state = 1;
     
-    USBx_INEP(0)->DIEPTSIZ = (1 << 19) | len;
+    USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
     USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;
     
-    if (len > 0) {
-        usb_write_fifo(0, data, len);
+    if (pkt > 0) {
+        usb_write_fifo(0, data, pkt);
     }
 }
 
@@ -654,11 +654,24 @@ void OTG_FS_IRQHandler(void) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
                 debug_ep0_in_xfrc++;
                 
-                if (ep0_state == 1 && ep0_tx_len > 64) {
-                    // Multi-packet transfer
-                    ep0_tx_ptr += 64;
-                    ep0_tx_len -= 64;
-                    usb_ep0_transmit(ep0_tx_ptr, ep0_tx_len);
+                // Update pointer after sending
+                if (ep0_state == 1) {
+                    uint16_t sent = (ep0_tx_len > 64) ? 64 : ep0_tx_len;
+                    ep0_tx_ptr += sent;
+                    ep0_tx_len -= sent;
+                    
+                    if (ep0_tx_len > 0) {
+                        // Send next chunk
+                        uint16_t pkt = (ep0_tx_len > 64) ? 64 : ep0_tx_len;
+                        USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
+                        USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;
+                        usb_write_fifo(0, ep0_tx_ptr, pkt);
+                    } else {
+                        ep0_state = 0;
+                        // Prepare EP0 OUT
+                        USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
+                        USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
+                    }
                 } else {
                     ep0_state = 0;
                     // Prepare EP0 OUT for next SETUP
