@@ -152,6 +152,11 @@ static void usb_handle_setup(void) {
     debug_setup_count++;
     memcpy(last_setup_packet, setup_packet, 8);
     
+    // Reset EP0 state
+    ep0_state = 0;
+    ep0_tx_ptr = NULL;
+    ep0_tx_len = 0;
+    
     uint8_t req_type = setup_packet[0];
     uint8_t req = setup_packet[1];
     uint16_t wValue = setup_packet[2] | (setup_packet[3] << 8);
@@ -174,8 +179,11 @@ static void usb_handle_setup(void) {
             }
         } else if (req == USB_REQ_SET_ADDRESS) {
             uint8_t addr = wValue & 0x7F;
-            pending_address = addr;
-            usb_ep0_transmit(NULL, 0); // Status stage - address will be set on completion
+            // Set address immediately (before status stage)
+            USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (addr << 4);
+            usb_state = (addr != 0) ? USB_STATE_ADDRESSED : USB_STATE_DEFAULT;
+            debug_address_set++;
+            usb_ep0_transmit(NULL, 0); // Status stage
         } else if (req == USB_REQ_SET_CONFIGURATION) {
             usb_configured = 1;
             usb_state = USB_STATE_CONFIGURED;
@@ -633,14 +641,6 @@ void OTG_FS_IRQHandler(void) {
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
                 debug_ep0_in_xfrc++;
-                
-                // Set address if pending
-                if (pending_address) {
-                    USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (pending_address << 4);
-                    usb_state = (pending_address != 0) ? USB_STATE_ADDRESSED : USB_STATE_DEFAULT;
-                    pending_address = 0;
-                    debug_address_set++;
-                }
                 
                 if (ep0_state == 1 && ep0_tx_len > 64) {
                     // Multi-packet transfer
