@@ -214,6 +214,15 @@ static void usb_handle_setup(void) {
 
 static int usb_cdc_available(void);
 
+// USB soft disconnect/reconnect (for testing)
+static void usb_soft_disconnect(void) {
+    USBx_DEVICE->DCTL |= USB_OTG_DCTL_SDIS;
+}
+
+static void usb_soft_reconnect(void) {
+    USBx_DEVICE->DCTL &= ~USB_OTG_DCTL_SDIS;
+}
+
 // USB Core initialization
 static void usb_core_init(void) {
     // Core soft reset
