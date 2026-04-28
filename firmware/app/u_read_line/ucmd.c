@@ -40,58 +40,8 @@ int ucmd_mcu_reset(int argc, char **argv) {
 }
 
 extern const drv_face_t dev_usb_cdc;
-int ucmd_usb(int argc, char **argv) {
-  if (argc > 1 && strcmp(argv[1], "reconnect") == 0) {
-    printf("USB reconnecting...\r\n");
-    dev_usb_cdc.ioctl(USB_CDC_SOFT_DISCONNECT, NULL);
-    for (volatile int i = 0; i < 1000000; i++);
-    dev_usb_cdc.ioctl(USB_CDC_SOFT_RECONNECT, NULL);
-    printf("Done!\r\n");
-    return 0;
-  }
-  
-  if (argc > 1 && strcmp(argv[1], "read") == 0) {
-    int avail = 0;
-    dev_usb_cdc.ioctl(USB_CDC_GET_AVAILABLE, &avail);
-    printf("Available: %d bytes\r\n", avail);
-    if (avail > 0) {
-      char buf[128];
-      int len = (avail > 127) ? 127 : avail;
-      int read = dev_usb_cdc.read(buf, len);
-      buf[read] = '\0';
-      printf("Read %d bytes: '%s'\r\n", read, buf);
-    }
-    return 0;
-  }
-  
-  if (argc > 1 && strcmp(argv[1], "write") == 0) {
-    const char *msg = "Hello from STM32!\r\n";
-    int written = dev_usb_cdc.write(msg, strlen(msg));
-    printf("Written %d bytes\r\n", written);
-    return 0;
-  }
-  
-  usb_cdc_debug_stats_t stats;
-  dev_usb_cdc.ioctl(USB_CDC_GET_DEBUG_STATS, &stats);
-  printf("USB Debug Stats:\r\n");
-  printf("  RESET:  %lu\r\n", stats.reset_count);
-  printf("  SETUP:  %lu\r\n", stats.setup_count);
-  printf("  RXFLVL: %lu\r\n", stats.rxflvl_count);
-  printf("  ADDR_SET: %lu\r\n", stats.address_set);
-  printf("  EP0_IN_XFRC: %lu (s1=%lu rem0=%lu)\r\n", stats.ep0_in_xfrc, stats.xfrc_with_state1, stats.xfrc_remaining0);
-  printf("  MULTI_PKT: %lu (total=%u sent=%u just=%u wLen=%u cfg=%lu w9=%lu w67=%lu tx67=%lu ep0st=%u)\r\n", 
-         stats.multi_packet, stats.last_total, stats.last_sent, stats.just_sent, stats.last_wLength, stats.get_config_desc, stats.config_wlen9, stats.config_wlen67, stats.ep0_tx_len67, stats.last_ep0_state);
-  printf("  Last SETUP: %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
-         stats.last_setup[0], stats.last_setup[1], stats.last_setup[2], stats.last_setup[3],
-         stats.last_setup[4], stats.last_setup[5], stats.last_setup[6], stats.last_setup[7]);
-  printf("  SETUP History:\r\n");
-  for (int i = 0; i < 5; i++) {
-    printf("    [%d] %02x %02x %02x %02x %02x %02x %02x %02x\r\n", i,
-           stats.setup_hist[i][0], stats.setup_hist[i][1], stats.setup_hist[i][2], stats.setup_hist[i][3],
-           stats.setup_hist[i][4], stats.setup_hist[i][5], stats.setup_hist[i][6], stats.setup_hist[i][7]);
-  }
-  return 0;
-}
+// Moved to app/usb_cdc/ucmd_usb.c
+extern int ucmd_usb(int argc, char **argv);
 
 extern command_t cmd_list[];
 // Пример cmd_list.
@@ -128,7 +78,7 @@ command_t cmd_list[] = {
   },
   {
     .cmd  = "usb",
-    .help = "usb stats, 'usb read/write' to test, 'usb reconnect' to re-enum",
+    .help = "usb commands, use 'usb help'",
     .fn   = ucmd_usb,
   },
   {0}, // null list terminator DON'T FORGET THIS!

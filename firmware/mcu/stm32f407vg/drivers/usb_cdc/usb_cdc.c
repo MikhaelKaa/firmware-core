@@ -64,33 +64,11 @@ static struct {
 // Control line state (DTR, RTS)
 static volatile uint16_t control_line_state = 0;
 
-// Debug counters
-static volatile uint32_t debug_reset_count = 0;
-static volatile uint32_t debug_setup_count = 0;
-static volatile uint32_t debug_rxflvl_count = 0;
-static volatile uint32_t debug_address_set = 0;
-static volatile uint32_t debug_ep0_in_xfrc = 0;
-static volatile uint32_t debug_multi_packet = 0;
-static volatile uint16_t debug_last_total = 0;
-static volatile uint16_t debug_last_sent = 0;
-static volatile uint16_t debug_just_sent = 0;
-static volatile uint16_t debug_last_wLength = 0;
-static volatile uint32_t debug_xfrc_with_state1 = 0;
-static volatile uint32_t debug_get_config_desc = 0;
-static volatile uint32_t debug_config_wlen9 = 0;
-static volatile uint32_t debug_config_wlen67 = 0;
-static volatile uint8_t debug_last_ep0_state = 0;
-static volatile uint32_t debug_xfrc_remaining0 = 0;
-static volatile uint32_t debug_ep0_tx_len67 = 0;  // ep0_transmit called with len=67  // XFRC with remaining=0  // ep0_state at last XFRC  // Config requests with wLen=67  // Config requests with wLen=9
-
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
 
 // SETUP packet buffer
 static uint8_t setup_packet[8];
-static uint8_t last_setup_packet[8]; // For debugging
-static uint8_t setup_history[5][8] = {0};  // Last 5 SETUP packets
-static uint8_t setup_hist_idx = 0;
 
 // EP0 state
 static uint8_t ep0_state = 0; // 0=IDLE, 1=DATA_IN, 2=DATA_OUT, 3=STATUS_IN, 4=STATUS_OUT
@@ -155,7 +133,6 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
     }
     
     if (len == 67) {
-        debug_ep0_tx_len67++;
     }
     
     uint16_t pkt = (len > 64) ? 64 : len;
@@ -175,11 +152,6 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
 
 // Handle standard device requests
 static void usb_handle_setup(void) {
-    debug_setup_count++;
-    memcpy(last_setup_packet, setup_packet, 8);
-    memcpy(setup_history[setup_hist_idx], setup_packet, 8);
-    setup_hist_idx = (setup_hist_idx + 1) % 5;
-    
     // Don't reset EP0 state if transmission in progress
     if (ep0_state != 1) {
         ep0_state = 0;
@@ -200,15 +172,10 @@ static void usb_handle_setup(void) {
             if (desc_type == USB_DESC_TYPE_DEVICE) {
                 usb_ep0_transmit(usb_device_desc, (wLength < 18) ? wLength : 18);
             } else if (desc_type == USB_DESC_TYPE_CONFIGURATION) {
-                debug_get_config_desc++;
                 if (wLength == 9) {
-                    debug_config_wlen9++;
                 } else if (wLength >= 67) {
-                    debug_config_wlen67++;
                 }
-                debug_last_wLength = wLength;
                 uint16_t len = (wLength < 67) ? wLength : 67;
-                debug_last_total = len;
                 usb_ep0_transmit(usb_config_desc, len);
             } else if (desc_type == USB_DESC_TYPE_STRING) {
                 if (desc_index < usb_string_desc_count) {
@@ -224,7 +191,6 @@ static void usb_handle_setup(void) {
             // Set address immediately (before status stage)
             USBx_DEVICE->DCFG = (USBx_DEVICE->DCFG & ~USB_OTG_DCFG_DAD) | (addr << 4);
             usb_state = (addr != 0) ? USB_STATE_ADDRESSED : USB_STATE_DEFAULT;
-            debug_address_set++;
             usb_ep0_transmit(NULL, 0); // Status stage
         } else if (req == USB_REQ_SET_CONFIGURATION) {
             usb_configured = 1;
@@ -513,31 +479,6 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
             }
             return 0;
 
-        case USB_CDC_GET_DEBUG_STATS:
-            if (arg != NULL) {
-                usb_cdc_debug_stats_t *stats = (usb_cdc_debug_stats_t *)arg;
-                stats->reset_count = debug_reset_count;
-                stats->setup_count = debug_setup_count;
-                stats->rxflvl_count = debug_rxflvl_count;
-                stats->address_set = debug_address_set;
-                stats->ep0_in_xfrc = debug_ep0_in_xfrc;
-                stats->multi_packet = debug_multi_packet;
-                stats->last_total = debug_last_total;
-                stats->last_sent = debug_last_sent;
-                stats->just_sent = debug_just_sent;
-                stats->last_wLength = debug_last_wLength;
-                stats->xfrc_with_state1 = debug_xfrc_with_state1;
-                stats->xfrc_remaining0 = debug_xfrc_remaining0;
-                stats->get_config_desc = debug_get_config_desc;
-                stats->config_wlen9 = debug_config_wlen9;
-                stats->config_wlen67 = debug_config_wlen67;
-                stats->ep0_tx_len67 = debug_ep0_tx_len67;
-                stats->last_ep0_state = debug_last_ep0_state;
-                memcpy(stats->last_setup, last_setup_packet, 8);
-                memcpy(stats->setup_hist, setup_history, sizeof(setup_history));
-            }
-            return 0;
-
         case USB_CDC_SOFT_DISCONNECT:
             usb_soft_disconnect();
             return 0;
@@ -570,7 +511,6 @@ void OTG_FS_IRQHandler(void) {
     // USB Reset
     if (gintsts & USB_OTG_GINTSTS_USBRST) {
         USBx->GINTSTS = USB_OTG_GINTSTS_USBRST;
-        debug_reset_count++;
         
         // Reset device state
         usb_state = USB_STATE_DEFAULT;
@@ -640,7 +580,6 @@ void OTG_FS_IRQHandler(void) {
     
     // RX FIFO non-empty - MUST be processed first
     if (gintsts & USB_OTG_GINTSTS_RXFLVL) {
-        debug_rxflvl_count++;
         uint32_t grxsts = USBx->GRXSTSP;
         uint8_t epnum = grxsts & 0xF;
         uint16_t count = (grxsts >> 4) & 0x7FF;
@@ -718,29 +657,21 @@ void OTG_FS_IRQHandler(void) {
             
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
-                debug_ep0_in_xfrc++;
-                debug_last_ep0_state = ep0_state;
                 
                 // Update pointer after sending
                 if (ep0_state == 1) {
-                    debug_xfrc_with_state1++;
                     uint16_t just_sent = (ep0_tx_total - ep0_tx_sent > 64) ? 64 : (ep0_tx_total - ep0_tx_sent);
-                    debug_just_sent = just_sent;
                     ep0_tx_sent += just_sent;
                     uint16_t remaining = ep0_tx_total - ep0_tx_sent;
                     
                     if (remaining > 0) {
                         // Send next chunk
-                        debug_multi_packet++;
-                        debug_last_total = ep0_tx_total;
-                        debug_last_sent = ep0_tx_sent;
                         uint16_t pkt = (remaining > 64) ? 64 : remaining;
                         
                         USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
                         USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;
                         usb_write_fifo(0, ep0_tx_ptr + ep0_tx_sent, pkt);
                     } else {
-                        debug_xfrc_remaining0++;
                         ep0_state = 0;
                         // Prepare EP0 OUT
                         USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;

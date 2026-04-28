@@ -51,6 +51,10 @@ C_INCLUDES += -Iapp/led
 C_SOURCES += app/w25q/ucmd_w25q.c
 C_INCLUDES += -Iapp/w25q
 
+# App usb_cdc
+C_SOURCES += app/usb_cdc/ucmd_usb.c
+C_INCLUDES += -Iapp/usb_cdc
+
 #######################################
 # binaries
 #######################################
