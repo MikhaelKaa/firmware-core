@@ -232,13 +232,13 @@ static void usb_handle_setup(void) {
 
 static int usb_cdc_available(void);
 
-// USB soft disconnect/reconnect via PA8 (D+ pull-up control)
+// USB soft disconnect/reconnect via PC9 (D+ pull-up control)
 static void usb_soft_disconnect(void) {
-    GPIOA->BSRR = GPIO_BSRR_BR8;  // Reset PA8 (disable pull-up)
+    GPIOC->BSRR = GPIO_BSRR_BR9;  // Reset PC9 (disable pull-up)
 }
 
 static void usb_soft_reconnect(void) {
-    GPIOA->BSRR = GPIO_BSRR_BS8;  // Set PA8 (enable pull-up)
+    GPIOC->BSRR = GPIO_BSRR_BS9;  // Set PC9 (enable pull-up)
 }
 
 // USB Core initialization
@@ -343,10 +343,11 @@ static int usb_cdc_init(void) {
     // No pull-up/pull-down
     GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12);
     
-    // PA8 as output for D+ pull-up control (1.5k to D+)
-    GPIOA->MODER &= ~GPIO_MODER_MODER8;
-    GPIOA->MODER |= (1 << GPIO_MODER_MODER8_Pos);  // Output
-    GPIOA->BSRR = GPIO_BSRR_BS8;  // Set high (enable pull-up)
+    // PC9 as output for D+ pull-up control (1.5k to D+)
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+    GPIOC->MODER &= ~GPIO_MODER_MODER9;
+    GPIOC->MODER |= (1 << GPIO_MODER_MODER9_Pos);  // Output
+    GPIOC->BSRR = GPIO_BSRR_BS9;  // Set high (enable pull-up)
     
     // Initialize USB core and device
     usb_core_init();
