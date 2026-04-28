@@ -30,6 +30,9 @@ typedef struct {
     uint16_t last_wLength;
     uint32_t xfrc_with_state1;
     uint32_t get_config_desc;
+    uint32_t config_wlen9;
+    uint32_t config_wlen67;
+    uint8_t last_ep0_state;
     uint8_t last_setup[8];
     uint8_t setup_hist[5][8];
 } usb_cdc_debug_stats_t;

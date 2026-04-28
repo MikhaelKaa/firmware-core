@@ -77,6 +77,9 @@ static volatile uint16_t debug_just_sent = 0;
 static volatile uint16_t debug_last_wLength = 0;
 static volatile uint32_t debug_xfrc_with_state1 = 0;
 static volatile uint32_t debug_get_config_desc = 0;
+static volatile uint32_t debug_config_wlen9 = 0;
+static volatile uint32_t debug_config_wlen67 = 0;
+static volatile uint8_t debug_last_ep0_state = 0;  // ep0_state at last XFRC  // Config requests with wLen=67  // Config requests with wLen=9
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -185,6 +188,11 @@ static void usb_handle_setup(void) {
                 usb_ep0_transmit(usb_device_desc, (wLength < 18) ? wLength : 18);
             } else if (desc_type == USB_DESC_TYPE_CONFIGURATION) {
                 debug_get_config_desc++;
+                if (wLength == 9) {
+                    debug_config_wlen9++;
+                } else if (wLength >= 67) {
+                    debug_config_wlen67++;
+                }
                 debug_last_wLength = wLength;
                 uint16_t len = (wLength < 67) ? wLength : 67;
                 debug_last_total = len;
@@ -507,6 +515,9 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->last_wLength = debug_last_wLength;
                 stats->xfrc_with_state1 = debug_xfrc_with_state1;
                 stats->get_config_desc = debug_get_config_desc;
+                stats->config_wlen9 = debug_config_wlen9;
+                stats->config_wlen67 = debug_config_wlen67;
+                stats->last_ep0_state = debug_last_ep0_state;
                 memcpy(stats->last_setup, last_setup_packet, 8);
                 memcpy(stats->setup_hist, setup_history, sizeof(setup_history));
             }
@@ -693,6 +704,7 @@ void OTG_FS_IRQHandler(void) {
             if (diepint & USB_OTG_DIEPINT_XFRC) {
                 USBx_INEP(0)->DIEPINT = USB_OTG_DIEPINT_XFRC;
                 debug_ep0_in_xfrc++;
+                debug_last_ep0_state = ep0_state;
                 
                 // Update pointer after sending
                 if (ep0_state == 1) {
