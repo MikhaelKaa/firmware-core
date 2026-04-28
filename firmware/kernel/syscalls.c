@@ -11,17 +11,50 @@
 #include <unistd.h>
 
 #include "drv_face.h"
+#include "uart.h"
 
 char*  __env[1] = {0};
 char** environ  = __env;
 
 extern const drv_face_t dev_uart1;
 
+#define PRINTF_BUF_SIZE (8192U)
+static uint8_t  printf_buf[PRINTF_BUF_SIZE];
+static volatile uint32_t printf_head = 0;
+static volatile uint32_t printf_tail = 0;
+
+void printf_flush(void) {
+    if (printf_tail == printf_head) return;
+    if (!dev_uart1.ioctl(UART_TX_READY, NULL)) return;
+
+    uint32_t head = printf_head;
+    uint32_t tail = printf_tail;
+    uint32_t chunk = (head > tail) ? (head - tail) : (PRINTF_BUF_SIZE - tail);
+
+    int sent = dev_uart1.write(&printf_buf[tail], chunk);
+    if (sent > 0)
+        printf_tail = (tail + (uint32_t)sent) % PRINTF_BUF_SIZE;
+}
+
+int printf_flush_pending(void) {
+    return printf_tail != printf_head;
+}
+
+static void printf_drain(void) {
+    while (printf_flush_pending()) printf_flush();
+}
+
 int _write(int file, char* ptr, int len)
 {
     if (file == STDOUT_FILENO || file == STDERR_FILENO)
     {
-        return dev_uart1.write(ptr, (size_t)len);
+        for (int i = 0; i < len; i++) {
+            if (((printf_head + 1) % PRINTF_BUF_SIZE) == printf_tail)
+                printf_drain(); // buffer full - wait
+            printf_buf[printf_head] = (uint8_t)ptr[i];
+            printf_head = (printf_head + 1) % PRINTF_BUF_SIZE;
+        }
+        return len;
     }
     errno = EIO;
     return -1;

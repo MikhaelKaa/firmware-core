@@ -225,6 +225,25 @@ static int uart_ioctl(int cmd, void *arg) {
             }
             return 0;
             
+        case UART_TX_READY:
+            return (tx_in_progress == 0) ? 1 : 0;
+
+        case UART_SET_BAUDRATE:
+            if (arg != NULL) {
+                uint32_t baudrate = *(uint32_t *)arg;
+                if (tx_in_progress) {
+                    return -EBUSY;
+                }
+                // Disable UART
+                USART2->CR1 &= ~USART_CR1_UE;
+                // Set new baudrate (APB1 = 42MHz for USART2)
+                USART2->BRR = (42000000U + baudrate / 2) / baudrate;
+                // Enable UART
+                USART2->CR1 |= USART_CR1_UE;
+                return 0;
+            }
+            return -EINVAL;
+            
         default:
             return -ENOTSUP;  // Command not supported
     }

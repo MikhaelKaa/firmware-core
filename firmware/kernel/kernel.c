@@ -65,10 +65,14 @@ int main(void)
 
     ucmd_default_init();
 
+    // Declare printf_flush
+    extern void printf_flush(void);
+
     while (1)
     {
         ucmd_default_proc();
         led_proc();
+        printf_flush();  // Flush printf buffer asynchronously
         for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
     }
 }
