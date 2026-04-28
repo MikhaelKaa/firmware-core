@@ -68,27 +68,6 @@ static uint16_t ep0_tx_len = 0;
 static uint16_t ep0_tx_total = 0;  // Total bytes to send
 static uint16_t ep0_tx_sent = 0;   // Bytes already sent
 
-// Open endpoint
-static void usb_ep_open(uint8_t ep_addr, uint8_t ep_type, uint16_t ep_mps) {
-    uint8_t ep_num = ep_addr & 0x7F;
-    uint8_t is_in = (ep_addr & 0x80) != 0;
-    
-    if (is_in) {
-        USBx_DEVICE->DAINTMSK |= (1 << ep_num);
-        USBx_INEP(ep_num)->DIEPCTL = (ep_mps & 0x7FF) | 
-                                      (ep_type << 18) | 
-                                      (ep_num << 22) |
-                                      USB_OTG_DIEPCTL_SD0PID_SEVNFRM |
-                                      USB_OTG_DIEPCTL_USBAEP;
-    } else {
-        USBx_DEVICE->DAINTMSK |= (1 << (ep_num + 16));
-        USBx_OUTEP(ep_num)->DOEPCTL = (ep_mps & 0x7FF) | 
-                                       (ep_type << 18) |
-                                       USB_OTG_DOEPCTL_SD0PID_SEVNFRM |
-                                       USB_OTG_DOEPCTL_USBAEP;
-    }
-}
-
 // Write to TX FIFO
 static void usb_write_fifo(uint8_t ep_num, const uint8_t *src, uint16_t len) {
     uint32_t count32 = (len + 3) / 4;
