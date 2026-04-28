@@ -74,6 +74,9 @@ static volatile uint32_t debug_multi_packet = 0;
 static volatile uint16_t debug_last_total = 0;
 static volatile uint16_t debug_last_sent = 0;
 static volatile uint16_t debug_just_sent = 0;
+static volatile uint16_t debug_last_wLength = 0;
+static volatile uint32_t debug_xfrc_with_state1 = 0;
+static volatile uint32_t debug_get_config_desc = 0;
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -177,6 +180,8 @@ static void usb_handle_setup(void) {
             if (desc_type == USB_DESC_TYPE_DEVICE) {
                 usb_ep0_transmit(usb_device_desc, (wLength < 18) ? wLength : 18);
             } else if (desc_type == USB_DESC_TYPE_CONFIGURATION) {
+                debug_get_config_desc++;
+                debug_last_wLength = wLength;
                 usb_ep0_transmit(usb_config_desc, (wLength < 67) ? wLength : 67);
             } else if (desc_type == USB_DESC_TYPE_STRING) {
                 if (desc_index < usb_string_desc_count) {
@@ -486,6 +491,10 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->multi_packet = debug_multi_packet;
                 stats->last_total = debug_last_total;
                 stats->last_sent = debug_last_sent;
+                stats->just_sent = debug_just_sent;
+                stats->last_wLength = debug_last_wLength;
+                stats->xfrc_with_state1 = debug_xfrc_with_state1;
+                stats->get_config_desc = debug_get_config_desc;
                 memcpy(stats->last_setup, last_setup_packet, 8);
             }
             return 0;
@@ -666,6 +675,7 @@ void OTG_FS_IRQHandler(void) {
                 
                 // Update pointer after sending
                 if (ep0_state == 1) {
+                    debug_xfrc_with_state1++;
                     uint16_t just_sent = (ep0_tx_total - ep0_tx_sent > 64) ? 64 : (ep0_tx_total - ep0_tx_sent);
                     debug_just_sent = just_sent;
                     ep0_tx_sent += just_sent;

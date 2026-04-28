@@ -24,6 +24,10 @@ typedef struct {
     uint32_t multi_packet;
     uint16_t last_total;
     uint16_t last_sent;
+    uint16_t just_sent;
+    uint16_t last_wLength;
+    uint32_t xfrc_with_state1;
+    uint32_t get_config_desc;
     uint8_t last_setup[8];
 } usb_cdc_debug_stats_t;
 
