@@ -84,6 +84,8 @@ static void (*usb_cdc_rx_callback)(void) = NULL;
 // SETUP packet buffer
 static uint8_t setup_packet[8];
 static uint8_t last_setup_packet[8]; // For debugging
+static uint8_t setup_history[5][8] = {0};  // Last 5 SETUP packets
+static uint8_t setup_hist_idx = 0;
 
 // EP0 state
 static uint8_t ep0_state = 0; // 0=IDLE, 1=DATA_IN, 2=DATA_OUT, 3=STATUS_IN, 4=STATUS_OUT
@@ -161,6 +163,8 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
 static void usb_handle_setup(void) {
     debug_setup_count++;
     memcpy(last_setup_packet, setup_packet, 8);
+    memcpy(setup_history[setup_hist_idx], setup_packet, 8);
+    setup_hist_idx = (setup_hist_idx + 1) % 5;
     
     // Reset EP0 state
     ep0_state = 0;
@@ -182,7 +186,9 @@ static void usb_handle_setup(void) {
             } else if (desc_type == USB_DESC_TYPE_CONFIGURATION) {
                 debug_get_config_desc++;
                 debug_last_wLength = wLength;
-                usb_ep0_transmit(usb_config_desc, (wLength < 67) ? wLength : 67);
+                uint16_t len = (wLength < 67) ? wLength : 67;
+                debug_last_total = len;
+                usb_ep0_transmit(usb_config_desc, len);
             } else if (desc_type == USB_DESC_TYPE_STRING) {
                 if (desc_index < usb_string_desc_count) {
                     uint8_t len = usb_string_desc[desc_index][0];
@@ -496,6 +502,7 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->xfrc_with_state1 = debug_xfrc_with_state1;
                 stats->get_config_desc = debug_get_config_desc;
                 memcpy(stats->last_setup, last_setup_packet, 8);
+                memcpy(stats->setup_hist, setup_history, sizeof(setup_history));
             }
             return 0;
 

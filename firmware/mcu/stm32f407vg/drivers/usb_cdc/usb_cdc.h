@@ -29,6 +29,7 @@ typedef struct {
     uint32_t xfrc_with_state1;
     uint32_t get_config_desc;
     uint8_t last_setup[8];
+    uint8_t setup_hist[5][8];
 } usb_cdc_debug_stats_t;
 
 const drv_face_t* dev_usb_cdc_get(void);

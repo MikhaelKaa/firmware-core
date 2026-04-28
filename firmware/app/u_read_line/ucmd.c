@@ -57,6 +57,12 @@ int ucmd_usb(int argc, char **argv) {
   printf("  Last SETUP: %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
          stats.last_setup[0], stats.last_setup[1], stats.last_setup[2], stats.last_setup[3],
          stats.last_setup[4], stats.last_setup[5], stats.last_setup[6], stats.last_setup[7]);
+  printf("  SETUP History:\r\n");
+  for (int i = 0; i < 5; i++) {
+    printf("    [%d] %02x %02x %02x %02x %02x %02x %02x %02x\r\n", i,
+           stats.setup_hist[i][0], stats.setup_hist[i][1], stats.setup_hist[i][2], stats.setup_hist[i][3],
+           stats.setup_hist[i][4], stats.setup_hist[i][5], stats.setup_hist[i][6], stats.setup_hist[i][7]);
+  }
   return 0;
 }
 
