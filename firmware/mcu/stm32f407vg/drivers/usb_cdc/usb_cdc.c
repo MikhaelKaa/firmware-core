@@ -51,15 +51,6 @@ static volatile uint32_t rx_write_pos = 0;
 // Transfer state
 static volatile uint8_t tx_in_progress = 0;
 static volatile uint8_t usb_configured = 0;
-static volatile uint8_t pending_address = 0;
-
-// Line coding (baudrate, stop bits, parity, data bits)
-static struct {
-    uint32_t bitrate;
-    uint8_t format;    // 0: 1 stop bit, 1: 1.5 stop bits, 2: 2 stop bits
-    uint8_t parity;    // 0: None, 1: Odd, 2: Even
-    uint8_t data_bits; // 5, 6, 7, 8, 16
-} line_coding = {115200, 0, 0, 8};
 
 // Control line state (DTR, RTS)
 static volatile uint16_t control_line_state = 0;
@@ -132,9 +123,6 @@ static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
         return;
     }
     
-    if (len == 67) {
-    }
-    
     uint16_t pkt = (len > 64) ? 64 : len;
     
     ep0_tx_ptr = (uint8_t *)data;
@@ -172,9 +160,6 @@ static void usb_handle_setup(void) {
             if (desc_type == USB_DESC_TYPE_DEVICE) {
                 usb_ep0_transmit(usb_device_desc, (wLength < 18) ? wLength : 18);
             } else if (desc_type == USB_DESC_TYPE_CONFIGURATION) {
-                if (wLength == 9) {
-                } else if (wLength >= 67) {
-                }
                 uint16_t len = (wLength < 67) ? wLength : 67;
                 usb_ep0_transmit(usb_config_desc, len);
             } else if (desc_type == USB_DESC_TYPE_STRING) {
@@ -286,9 +271,6 @@ static void usb_device_init(void) {
     
     // TX1 FIFO: 64 words at offset 192
     USBx->DIEPTXF[0] = (64 << 16) | 192;
-    
-    // TX2 FIFO: 16 words at offset 256 (for EP3 interrupt)
-    USBx->DIEPTXF[1] = (16 << 16) | 256;
     
     // TX2 FIFO: 16 words at offset 256 (for EP3 interrupt)
     USBx->DIEPTXF[1] = (16 << 16) | 256;
@@ -418,12 +400,17 @@ static int usb_cdc_read(void *buf, size_t count) {
         count = (size_t)available;
     }
     
+    // Disable USB interrupt during read to prevent race condition
+    NVIC_DisableIRQ(OTG_FS_IRQn);
+    
     // Read data from ring buffer
     for (size_t i = 0; i < count; i++) {
         buffer[i] = rx_buffer[rx_read_pos];
         rx_read_pos = (rx_read_pos + 1) % USB_CDC_RX_BUFFER_SIZE;
         bytes_read++;
     }
+    
+    NVIC_EnableIRQ(OTG_FS_IRQn);
     
     return (int)bytes_read;
 }
@@ -516,7 +503,6 @@ void OTG_FS_IRQHandler(void) {
         usb_state = USB_STATE_DEFAULT;
         usb_configured = 0;
         ep0_state = 0;
-        pending_address = 0;
         
         // Clear all interrupts
         USBx->GINTSTS = 0xFFFFFFFF;
@@ -594,10 +580,15 @@ void OTG_FS_IRQHandler(void) {
                 uint8_t temp[64];
                 usb_read_fifo(temp, count);
                 
-                // Copy to ring buffer
+                // Copy to ring buffer with overflow check
                 for (uint16_t i = 0; i < count; i++) {
-                    rx_buffer[rx_write_pos] = temp[i];
-                    rx_write_pos = (rx_write_pos + 1) % USB_CDC_RX_BUFFER_SIZE;
+                    uint32_t next_pos = (rx_write_pos + 1) % USB_CDC_RX_BUFFER_SIZE;
+                    // Check for buffer overflow
+                    if (next_pos != rx_read_pos) {
+                        rx_buffer[rx_write_pos] = temp[i];
+                        rx_write_pos = next_pos;
+                    }
+                    // If buffer full, drop data silently
                 }
                 
                 if (usb_cdc_rx_callback) {
