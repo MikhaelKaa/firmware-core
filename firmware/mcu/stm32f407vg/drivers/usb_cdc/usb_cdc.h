@@ -14,6 +14,8 @@
 #define USB_CDC_GET_DTR             (INTERFACE_CMD_DEVICE + 2)
 #define USB_CDC_GET_RTS             (INTERFACE_CMD_DEVICE + 3)
 #define USB_CDC_GET_DEBUG_STATS     (INTERFACE_CMD_DEVICE + 4)
+#define USB_CDC_SOFT_DISCONNECT     (INTERFACE_CMD_DEVICE + 5)
+#define USB_CDC_SOFT_RECONNECT      (INTERFACE_CMD_DEVICE + 6)
 
 typedef struct {
     uint32_t reset_count;

@@ -232,13 +232,13 @@ static void usb_handle_setup(void) {
 
 static int usb_cdc_available(void);
 
-// USB soft disconnect/reconnect (for testing)
+// USB soft disconnect/reconnect via PA8 (D+ pull-up control)
 static void usb_soft_disconnect(void) {
-    USBx_DEVICE->DCTL |= USB_OTG_DCTL_SDIS;
+    GPIOA->BSRR = GPIO_BSRR_BR8;  // Reset PA8 (disable pull-up)
 }
 
 static void usb_soft_reconnect(void) {
-    USBx_DEVICE->DCTL &= ~USB_OTG_DCTL_SDIS;
+    GPIOA->BSRR = GPIO_BSRR_BS8;  // Set PA8 (enable pull-up)
 }
 
 // USB Core initialization
@@ -342,6 +342,11 @@ static int usb_cdc_init(void) {
     
     // No pull-up/pull-down
     GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12);
+    
+    // PA8 as output for D+ pull-up control (1.5k to D+)
+    GPIOA->MODER &= ~GPIO_MODER_MODER8;
+    GPIOA->MODER |= (1 << GPIO_MODER_MODER8_Pos);  // Output
+    GPIOA->BSRR = GPIO_BSRR_BS8;  // Set high (enable pull-up)
     
     // Initialize USB core and device
     usb_core_init();
@@ -504,6 +509,14 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 memcpy(stats->last_setup, last_setup_packet, 8);
                 memcpy(stats->setup_hist, setup_history, sizeof(setup_history));
             }
+            return 0;
+
+        case USB_CDC_SOFT_DISCONNECT:
+            usb_soft_disconnect();
+            return 0;
+
+        case USB_CDC_SOFT_RECONNECT:
+            usb_soft_reconnect();
             return 0;
 
         default:

@@ -41,8 +41,14 @@ int ucmd_mcu_reset(int argc, char **argv) {
 
 extern const drv_face_t dev_usb_cdc;
 int ucmd_usb(int argc, char **argv) {
-  (void)(argc);
-  (void)(argv);
+  if (argc > 1 && strcmp(argv[1], "reconnect") == 0) {
+    printf("USB reconnecting...\r\n");
+    dev_usb_cdc.ioctl(USB_CDC_SOFT_DISCONNECT, NULL);
+    for (volatile int i = 0; i < 1000000; i++);  // ~100ms delay
+    dev_usb_cdc.ioctl(USB_CDC_SOFT_RECONNECT, NULL);
+    printf("Done!\r\n");
+    return 0;
+  }
   
   usb_cdc_debug_stats_t stats;
   dev_usb_cdc.ioctl(USB_CDC_GET_DEBUG_STATS, &stats);
@@ -101,7 +107,7 @@ command_t cmd_list[] = {
   },
   {
     .cmd  = "usb",
-    .help = "usb debug stats",
+    .help = "usb debug stats, 'usb reconnect' to re-enumerate",
     .fn   = ucmd_usb,
   },
   {0}, // null list terminator DON'T FORGET THIS!
