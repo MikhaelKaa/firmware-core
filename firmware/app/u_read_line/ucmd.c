@@ -44,9 +44,30 @@ int ucmd_usb(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "reconnect") == 0) {
     printf("USB reconnecting...\r\n");
     dev_usb_cdc.ioctl(USB_CDC_SOFT_DISCONNECT, NULL);
-    for (volatile int i = 0; i < 1000000; i++);  // ~100ms delay
+    for (volatile int i = 0; i < 1000000; i++);
     dev_usb_cdc.ioctl(USB_CDC_SOFT_RECONNECT, NULL);
     printf("Done!\r\n");
+    return 0;
+  }
+  
+  if (argc > 1 && strcmp(argv[1], "read") == 0) {
+    int avail = 0;
+    dev_usb_cdc.ioctl(USB_CDC_GET_AVAILABLE, &avail);
+    printf("Available: %d bytes\r\n", avail);
+    if (avail > 0) {
+      char buf[128];
+      int len = (avail > 127) ? 127 : avail;
+      int read = dev_usb_cdc.read(buf, len);
+      buf[read] = '\0';
+      printf("Read %d bytes: '%s'\r\n", read, buf);
+    }
+    return 0;
+  }
+  
+  if (argc > 1 && strcmp(argv[1], "write") == 0) {
+    const char *msg = "Hello from STM32!\r\n";
+    int written = dev_usb_cdc.write(msg, strlen(msg));
+    printf("Written %d bytes\r\n", written);
     return 0;
   }
   
@@ -107,7 +128,7 @@ command_t cmd_list[] = {
   },
   {
     .cmd  = "usb",
-    .help = "usb debug stats, 'usb reconnect' to re-enumerate",
+    .help = "usb stats, 'usb read/write' to test, 'usb reconnect' to re-enum",
     .fn   = ucmd_usb,
   },
   {0}, // null list terminator DON'T FORGET THIS!
