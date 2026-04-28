@@ -57,9 +57,9 @@ int ucmd_usb(int argc, char **argv) {
   printf("  SETUP:  %lu\r\n", stats.setup_count);
   printf("  RXFLVL: %lu\r\n", stats.rxflvl_count);
   printf("  ADDR_SET: %lu\r\n", stats.address_set);
-  printf("  EP0_IN_XFRC: %lu\r\n", stats.ep0_in_xfrc);
-  printf("  MULTI_PKT: %lu (total=%u sent=%u just=%u wLen=%u xfrc_s1=%lu cfg=%lu w9=%lu w67=%lu ep0st=%u)\r\n", 
-         stats.multi_packet, stats.last_total, stats.last_sent, stats.just_sent, stats.last_wLength, stats.xfrc_with_state1, stats.get_config_desc, stats.config_wlen9, stats.config_wlen67, stats.last_ep0_state);
+  printf("  EP0_IN_XFRC: %lu (s1=%lu rem0=%lu)\r\n", stats.ep0_in_xfrc, stats.xfrc_with_state1, stats.xfrc_remaining0);
+  printf("  MULTI_PKT: %lu (total=%u sent=%u just=%u wLen=%u cfg=%lu w9=%lu w67=%lu tx67=%lu ep0st=%u)\r\n", 
+         stats.multi_packet, stats.last_total, stats.last_sent, stats.just_sent, stats.last_wLength, stats.get_config_desc, stats.config_wlen9, stats.config_wlen67, stats.ep0_tx_len67, stats.last_ep0_state);
   printf("  Last SETUP: %02x %02x %02x %02x %02x %02x %02x %02x\r\n",
          stats.last_setup[0], stats.last_setup[1], stats.last_setup[2], stats.last_setup[3],
          stats.last_setup[4], stats.last_setup[5], stats.last_setup[6], stats.last_setup[7]);

@@ -79,7 +79,9 @@ static volatile uint32_t debug_xfrc_with_state1 = 0;
 static volatile uint32_t debug_get_config_desc = 0;
 static volatile uint32_t debug_config_wlen9 = 0;
 static volatile uint32_t debug_config_wlen67 = 0;
-static volatile uint8_t debug_last_ep0_state = 0;  // ep0_state at last XFRC  // Config requests with wLen=67  // Config requests with wLen=9
+static volatile uint8_t debug_last_ep0_state = 0;
+static volatile uint32_t debug_xfrc_remaining0 = 0;
+static volatile uint32_t debug_ep0_tx_len67 = 0;  // ep0_transmit called with len=67  // XFRC with remaining=0  // ep0_state at last XFRC  // Config requests with wLen=67  // Config requests with wLen=9
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -147,6 +149,15 @@ static void usb_read_fifo(uint8_t *dest, uint16_t len) {
 
 // EP0 transmit
 static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
+    // Don't start new transmission if one is in progress
+    if (ep0_state == 1) {
+        return;
+    }
+    
+    if (len == 67) {
+        debug_ep0_tx_len67++;
+    }
+    
     uint16_t pkt = (len > 64) ? 64 : len;
     
     ep0_tx_ptr = (uint8_t *)data;
@@ -169,8 +180,10 @@ static void usb_handle_setup(void) {
     memcpy(setup_history[setup_hist_idx], setup_packet, 8);
     setup_hist_idx = (setup_hist_idx + 1) % 5;
     
-    // Reset EP0 state
-    ep0_state = 0;
+    // Don't reset EP0 state if transmission in progress
+    if (ep0_state != 1) {
+        ep0_state = 0;
+    }
     ep0_tx_ptr = NULL;
     ep0_tx_len = 0;
     
@@ -514,9 +527,11 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->just_sent = debug_just_sent;
                 stats->last_wLength = debug_last_wLength;
                 stats->xfrc_with_state1 = debug_xfrc_with_state1;
+                stats->xfrc_remaining0 = debug_xfrc_remaining0;
                 stats->get_config_desc = debug_get_config_desc;
                 stats->config_wlen9 = debug_config_wlen9;
                 stats->config_wlen67 = debug_config_wlen67;
+                stats->ep0_tx_len67 = debug_ep0_tx_len67;
                 stats->last_ep0_state = debug_last_ep0_state;
                 memcpy(stats->last_setup, last_setup_packet, 8);
                 memcpy(stats->setup_hist, setup_history, sizeof(setup_history));
@@ -725,6 +740,7 @@ void OTG_FS_IRQHandler(void) {
                         USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;
                         usb_write_fifo(0, ep0_tx_ptr + ep0_tx_sent, pkt);
                     } else {
+                        debug_xfrc_remaining0++;
                         ep0_state = 0;
                         // Prepare EP0 OUT
                         USBx_OUTEP(0)->DOEPTSIZ = (3 << 29) | (1 << 19) | 64;
