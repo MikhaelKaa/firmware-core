@@ -71,6 +71,9 @@ static volatile uint32_t debug_rxflvl_count = 0;
 static volatile uint32_t debug_address_set = 0;
 static volatile uint32_t debug_ep0_in_xfrc = 0;
 static volatile uint32_t debug_multi_packet = 0;
+static volatile uint16_t debug_last_total = 0;
+static volatile uint16_t debug_last_sent = 0;
+static volatile uint16_t debug_just_sent = 0;
 
 // Callback for RX data
 static void (*usb_cdc_rx_callback)(void) = NULL;
@@ -83,6 +86,8 @@ static uint8_t last_setup_packet[8]; // For debugging
 static uint8_t ep0_state = 0; // 0=IDLE, 1=DATA_IN, 2=DATA_OUT, 3=STATUS_IN, 4=STATUS_OUT
 static const uint8_t *ep0_tx_ptr = NULL;
 static uint16_t ep0_tx_len = 0;
+static uint16_t ep0_tx_total = 0;  // Total bytes to send
+static uint16_t ep0_tx_sent = 0;   // Bytes already sent
 
 // Open endpoint
 static void usb_ep_open(uint8_t ep_addr, uint8_t ep_type, uint16_t ep_mps) {
@@ -136,8 +141,9 @@ static void usb_read_fifo(uint8_t *dest, uint16_t len) {
 static void usb_ep0_transmit(const uint8_t *data, uint16_t len) {
     uint16_t pkt = (len > 64) ? 64 : len;
     
-    ep0_tx_ptr = data;
-    ep0_tx_len = len;  // Save FULL length
+    ep0_tx_ptr = (uint8_t *)data;
+    ep0_tx_total = len;
+    ep0_tx_sent = 0;
     ep0_state = 1;
     
     USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
@@ -478,6 +484,8 @@ static int usb_cdc_ioctl(int cmd, void *arg) {
                 stats->address_set = debug_address_set;
                 stats->ep0_in_xfrc = debug_ep0_in_xfrc;
                 stats->multi_packet = debug_multi_packet;
+                stats->last_total = debug_last_total;
+                stats->last_sent = debug_last_sent;
                 memcpy(stats->last_setup, last_setup_packet, 8);
             }
             return 0;
@@ -658,17 +666,21 @@ void OTG_FS_IRQHandler(void) {
                 
                 // Update pointer after sending
                 if (ep0_state == 1) {
-                    uint16_t sent = (ep0_tx_len > 64) ? 64 : ep0_tx_len;
-                    ep0_tx_ptr += sent;
-                    ep0_tx_len -= sent;
+                    uint16_t just_sent = (ep0_tx_total - ep0_tx_sent > 64) ? 64 : (ep0_tx_total - ep0_tx_sent);
+                    debug_just_sent = just_sent;
+                    ep0_tx_sent += just_sent;
+                    uint16_t remaining = ep0_tx_total - ep0_tx_sent;
                     
-                    if (ep0_tx_len > 0) {
+                    if (remaining > 0) {
                         // Send next chunk
                         debug_multi_packet++;
-                        uint16_t pkt = (ep0_tx_len > 64) ? 64 : ep0_tx_len;
+                        debug_last_total = ep0_tx_total;
+                        debug_last_sent = ep0_tx_sent;
+                        uint16_t pkt = (remaining > 64) ? 64 : remaining;
+                        
                         USBx_INEP(0)->DIEPTSIZ = (1 << 19) | pkt;
                         USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA;
-                        usb_write_fifo(0, ep0_tx_ptr, pkt);
+                        usb_write_fifo(0, ep0_tx_ptr + ep0_tx_sent, pkt);
                     } else {
                         ep0_state = 0;
                         // Prepare EP0 OUT
