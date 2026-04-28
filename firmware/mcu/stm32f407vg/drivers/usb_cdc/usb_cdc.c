@@ -594,6 +594,16 @@ void OTG_FS_IRQHandler(void) {
                 if (usb_cdc_rx_callback) {
                     usb_cdc_rx_callback();
                 }
+            } else if (epnum == 0) {
+                // EP0 OUT - control data (e.g., line coding)
+                uint8_t temp[64];
+                usb_read_fifo(temp, count);
+            }
+        } else if (pktsts == 4) { // OUT transfer completed
+            if (epnum == 1) {
+                // Re-enable EP1 OUT for next packet
+                USBx_OUTEP(1)->DOEPTSIZ = (1 << 19) | 64;
+                USBx_OUTEP(1)->DOEPCTL |= USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA;
             }
         }
         // Don't return - continue to process OEPINT
