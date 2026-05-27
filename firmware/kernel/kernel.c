@@ -14,6 +14,7 @@
 #include "pwm_led.h"
 #include "w25q.h"
 #include "usb_cdc.h"
+#include "adc.h"
 
 extern const drv_face_t dev_uart1;
 
@@ -62,6 +63,13 @@ int main(void)
     const drv_face_t* usb_cdc = dev_usb_cdc_get();
     usb_cdc->ioctl(INTERFACE_INIT, NULL);
     printf("USB CDC initialized\r\n");
+
+    // Initialize ADC1
+    const drv_face_t* adc1 = dev_adc1_get();
+    adc1->ioctl(INTERFACE_INIT, NULL);
+    const char* adc_ver = NULL;
+    adc1->ioctl(INTERFACE_GET_INFO, &adc_ver);
+    printf("ADC1 initialized: %s\r\n", adc_ver);
 
     ucmd_default_init();
 

@@ -12,6 +12,7 @@
 #include "ucmd_led.h"
 #include "ucmd_w25q.h"
 #include "usb_cdc.h"
+#include "ucmd_adc.h"
 
 int ucmd_parse(command_t cmd_list[], int argc, const char **argv)
 {
@@ -80,6 +81,11 @@ command_t cmd_list[] = {
     .cmd  = "usb",
     .help = "usb commands, use 'usb help'",
     .fn   = ucmd_usb,
+  },
+  {
+    .cmd  = "adc",
+    .help = "adc commands, use 'adc help'",
+    .fn   = ucmd_adc,
   },
   {0}, // null list terminator DON'T FORGET THIS!
 };

@@ -55,6 +55,10 @@ C_INCLUDES += -Iapp/w25q
 C_SOURCES += app/usb_cdc/ucmd_usb.c
 C_INCLUDES += -Iapp/usb_cdc
 
+# App adc
+C_SOURCES += app/adc/ucmd_adc.c
+C_INCLUDES += -Iapp/adc
+
 #######################################
 # binaries
 #######################################
