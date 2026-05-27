@@ -190,6 +190,6 @@ setup-vscode:
 OPENOCD_TRANSPORT_CFG ?= mcu/common/openocd/stlink.cfg
 # Load firmware.bin (hex) use OpenOCD
 load:
-	openocd.exe -f $(OPENOCD_TRANSPORT_CFG) -f $(OPENOCD_MCU_CFG) -c init -c "reset halt" -c "flash write_image erase $(BUILD_DIR)/$(TARGET).hex" -c "reset run" -c "exit"
+	openocd -f $(OPENOCD_TRANSPORT_CFG) -f $(OPENOCD_MCU_CFG) -c init -c "reset halt" -c "flash write_image erase $(BUILD_DIR)/$(TARGET).hex" -c "reset run" -c "exit"
 
 # *** EOF ***

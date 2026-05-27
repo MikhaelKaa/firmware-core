@@ -12,3 +12,4 @@
 
 firmware/local.mk
 .vscode/*
+.aider*
