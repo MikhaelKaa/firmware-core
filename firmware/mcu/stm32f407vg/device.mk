@@ -15,6 +15,7 @@ C_SOURCES += mcu/$(MCU_PATH)/drivers/led/pwm_led.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/w25q/w25q.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/usb_cdc/usb_cdc.c
 C_SOURCES += mcu/$(MCU_PATH)/drivers/usb_cdc/usb_desc.c
+C_SOURCES += mcu/$(MCU_PATH)/drivers/adc/adc.c
 
 
 # C includes
@@ -27,6 +28,7 @@ C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/rtc
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/led
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/w25q
 C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/usb_cdc
+C_INCLUDES += -Imcu/$(MCU_PATH)/drivers/adc
 
 # ASM sources
 ASM_SOURCES +=  ./mcu/$(MCU_PATH)/vendor/startup/startup_stm32f407xx.s
