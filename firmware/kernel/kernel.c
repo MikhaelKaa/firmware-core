@@ -24,6 +24,15 @@ int main(void)
     char *uart_ver = 0;
     drv_face_t* uart = 0;
 
+    char logo[] = "\r\n\
+         /|_/|  \r\n\
+        ( o.o ) \r\n\
+         > * <  \r\n\
+         /(_)|--\r\n\
+         _| |_  \r\n";
+    
+    printf("%s", logo);
+
     us_init();
 
     drv_face_t* led = dev_pwm_led_get();
@@ -31,6 +40,7 @@ int main(void)
     void (*led_proc)(void) = NULL;
     led->ioctl(INTERFACE_GET_PROC, &led_proc);
 
+    
     // set driver over SVC
     fc_drv_table_set(&dev_uart1, 0);
     
