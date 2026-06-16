@@ -15,6 +15,7 @@ static uint16_t adc1_dma_buffer[ADC1_BUFFER_SIZE];
 /* DMA transfer state */
 static volatile uint8_t adc1_running = 0;
 static volatile uint32_t adc1_status = 0;
+static volatile uint32_t adc1_read_ptr = 0;
 
 /* Callbacks for DMA events */
 static void (*adc1_half_callback)(void) = NULL;
@@ -55,41 +56,39 @@ static int adc1_init(void) {
     ADC1->SQR3 = 0;
     ADC1->JSQR = 0;
     
-    /* Configure SMPR2 for channel 0 sampling time (480 cycles for accuracy) */
+    /* Configure SMPR2 for channel 0 sampling time (faster sampling) */
     /* SMPR2_SMP0[2:0] bits at position 0 */
     ADC1->SMPR2 &= ~ADC_SMPR2_SMP0_Msk;
-    ADC1->SMPR2 |= (7UL << ADC_SMPR2_SMP0_Pos);  /* 480.5 sampling cycles */
+    ADC1->SMPR2 |= (3UL << ADC_SMPR2_SMP0_Pos);  /* 56 cycles */
     
     /* Configure ADC1 CR1:
-     * - Scan mode (for multi-channel support)
+     * - Disable scan mode for single channel conversion
      */
-    ADC1->CR1 = ADC_CR1_SCAN;  /* Scan mode enabled */
+    ADC1->CR1 = 0;  /* Scan mode disabled */
     
     /* Configure ADC1 CR2:
      * - Right alignment
-     * - External trigger TIM6 TRGO (EXTSEL = 0b1111 = 15)
-     * - External trigger enable (rising edge)
-     * - DMA continuous requests (DDS = 1 for single mode)
+     * - Continuous conversion mode (CONT = 1)
+     * - DMA continuous requests (DDS = 1)
      * - DMA enable
      */
     ADC1->CR2 = ADC_CR2_ALIGN |                    /* Right alignment */
-                (15 << ADC_CR2_EXTSEL_Pos) |       /* TIM6 TRGO trigger */
-                ADC_CR2_EXTEN_0 | ADC_CR2_EXTEN_1 | /* Rising edge trigger */
-                ADC_CR2_DDS |                       /* DMA continuous mode */
+                ADC_CR2_CONT |                     /* Continuous conversion mode */
+                ADC_CR2_DDS |                      /* DMA disable selection: continue conversions */
                 ADC_CR2_DMA;                        /* DMA enable */
+// No change here, but I will check the sampling time next.
     
     /* Enable ADC1 (double write for power-up) */
     ADC1->CR2 |= ADC_CR2_ADON;
     (void)ADC1->DR;  /* Wake up */
     ADC1->CR2 |= ADC_CR2_ADON;
+
+    /* Calibration: essential for some STM32F4 chips to avoid lock-ups or offsets */
+    // ADC1->CR2 |= ADC_CR2_CAL;
+    // while (ADC1->CR2 & ADC_CR2_CAL); /* Wait for calibration to complete */
     
-    /* Wait for ADC ready */
-    {
-        int i;
-        for (i = 0; i < 1000000; i++) {
-            if (ADC1->SR & ADC_SR_EOC) break;
-        }
-    }
+    /* Wait for ADC ready - remove blocking EOC wait as it requires a trigger */
+    // Removed blocking EOC wait
     
     /* Configure TIM6 for ADC1 trigger */
     {
@@ -102,8 +101,9 @@ static int adc1_init(void) {
         arr_val = 0;
         
         for (prescaler = 0; prescaler < 0xFFFF; prescaler++) {
-            arr_val = (apb1_clk / (apb1_clk / (prescaler + 1))) / adc1_freq - 1;
-            if (arr_val < 0x10000) {
+            uint64_t temp_arr = (uint64_t)apb1_clk / ((uint64_t)(prescaler + 1) * adc1_freq);
+            if (temp_arr > 0 && temp_arr <= 0x10000) {
+                arr_val = (uint32_t)temp_arr - 1;
                 break;
             }
         }
@@ -120,8 +120,7 @@ static int adc1_init(void) {
         /* Set TRGO source to update event */
         TIM6->CR2 = TIM_CR2_MMS_1 | TIM_CR2_MMS_0;  /* TRGO = TIM6 update */
         
-        /* Enable TIM6 */
-        TIM6->CR1 |= TIM_CR1_CEN;
+        /* Timer is enabled in adc1_start() to avoid overruns during init */
     }
     
     /* Clear DMA buffer */
@@ -141,7 +140,7 @@ static int adc1_deinit(void) {
     DMA2_Stream0->CR &= ~DMA_SxCR_EN;
     while (DMA2_Stream0->CR & DMA_SxCR_EN);
     
-    /* Disable TIM6 */
+    /* TIM6 already disabled in adc1_stop or is handled here if deinit called alone */
     TIM6->CR1 &= ~TIM_CR1_CEN;
     
     /* Disable interrupts */
@@ -160,39 +159,32 @@ static int adc1_read(void *buf, size_t count) {
         return -EINVAL;
     }
     
-    uint8_t *buffer = (uint8_t *)buf;
-    size_t bytes_to_read;
-    size_t available;
-    uint32_t current_ndtr;
-    uint32_t samples_to_read;
-    
+    uint8_t *dest = (uint8_t *)buf;
     if (!adc1_running) {
         return -EAGAIN;
     }
     
-    /* Get current DMA remaining count */
-    current_ndtr = DMA2_Stream0->NDTR;
-    
-    /* Calculate available samples */
-    available = ADC1_BUFFER_SIZE - current_ndtr;
+    /* DMA NDTR counts down from BUFFER_SIZE to 0 */
+    uint32_t write_ptr = ADC1_BUFFER_SIZE - DMA2_Stream0->NDTR;
+    uint32_t available = (write_ptr + ADC1_BUFFER_SIZE - adc1_read_ptr) % ADC1_BUFFER_SIZE;
     
     if (available == 0) {
-        return 0;  /* No data available */
+        return 0;
     }
     
-    /* Calculate how many samples we can read */
-    samples_to_read = available;
-    bytes_to_read = samples_to_read * sizeof(uint16_t);
-    
-    if (bytes_to_read > count) {
-        bytes_to_read = count;
+    uint32_t samples_to_read = available;
+    if ((samples_to_read * sizeof(uint16_t)) > count) {
         samples_to_read = count / sizeof(uint16_t);
     }
     
-    /* Copy data from DMA buffer to user buffer */
-    memcpy(buffer, adc1_dma_buffer, bytes_to_read);
+    size_t bytes_read = 0;
+    for (uint32_t i = 0; i < samples_to_read; i++) {
+        ((uint16_t *)dest)[i] = adc1_dma_buffer[adc1_read_ptr];
+        adc1_read_ptr = (adc1_read_ptr + 1) % ADC1_BUFFER_SIZE;
+        bytes_read += sizeof(uint16_t);
+    }
     
-    return (int)bytes_to_read;
+    return (int)bytes_read;
 }
 
 /* Write to ADC1 (interface implementation) - not supported */
@@ -228,6 +220,11 @@ static int adc1_start(void) {
                        DMA_SxCR_TCIE;                 /* Transfer complete interrupt */
     
     DMA2_Stream0->FCR = 0;  /* No FIFO */
+
+    /* Enable DMA stream */
+    DMA2_Stream0->CR |= DMA_SxCR_EN;
+
+    adc1_read_ptr = 0;
     
     /* Enable DMA request */
     ADC1->CR2 |= ADC_CR2_DMA;
@@ -236,12 +233,23 @@ static int adc1_start(void) {
     NVIC_SetPriority(DMA2_Stream0_IRQn, 0);
     NVIC_EnableIRQ(DMA2_Stream0_IRQn);
     
-    /* Enable ADC interrupt */
-    NVIC_SetPriority(ADC_IRQn, 1);
-    NVIC_EnableIRQ(ADC_IRQn);
+    /* Disable ADC interrupt to isolate problem from IRQ handler */
+    // NVIC_SetPriority(ADC_IRQn, 1);
+    // NVIC_EnableIRQ(ADC_IRQn);
     
-    /* Start conversion by enabling ADC */
+    /* Clear any pending flags before starting */
+    ADC1->SR = 0;
+    (void)ADC1->DR;
+
+    /* Start conversion by enabling ADC and triggering software start */
     ADC1->CR2 |= ADC_CR2_ADON;
+    
+    /* Wait a bit for ADC power-up then trigger first conversion */
+    for(volatile int i=0; i<1000; i++); 
+    ADC1->CR2 |= ADC_CR2_SWSTART;
+
+    /* Keep TIM6 enabled just in case, but we are testing CONT + SWSTART now */
+    TIM6->CR1 |= TIM_CR1_CEN;
     
     adc1_running = 1;
     adc1_status |= ADC1_STATUS_RUNNING;
@@ -255,6 +263,9 @@ static int adc1_stop(void) {
         return 0;  /* Already stopped */
     }
     
+    /* Stop the trigger source first */
+    TIM6->CR1 &= ~TIM_CR1_CEN;
+
     /* Disable ADC */
     ADC1->CR2 &= ~ADC_CR2_ADON;
     
@@ -306,8 +317,9 @@ static int adc1_ioctl(int cmd, void *arg) {
                     uint32_t arr_val;
                     
                     for (prescaler = 0; prescaler < 0xFFFF; prescaler++) {
-                        arr_val = (apb1_clk / (apb1_clk / (prescaler + 1))) / adc1_freq - 1;
-                        if (arr_val < 0x10000) {
+                        uint64_t temp_arr = (uint64_t)apb1_clk / ((uint64_t)(prescaler + 1) * adc1_freq);
+                        if (temp_arr > 0 && temp_arr <= 0x10000) {
+                            arr_val = (uint32_t)temp_arr - 1;
                             break;
                         }
                     }
@@ -348,7 +360,13 @@ static int adc1_ioctl(int cmd, void *arg) {
         
         case ADC1_GET_STATUS:
             if (arg != NULL) {
+                /* Return the status flags */
                 *(uint32_t *)arg = adc1_status;
+                
+                /* Diagnostic output to UART for debugging "1 sample" issue */
+                printf("[DEBUG] ADC1->SR: 0x%08X, DMA2_S0->NDTR: %lu, TIM6->CNT: %lu\n", 
+                       (unsigned int)ADC1->SR, (unsigned long)DMA2_Stream0->NDTR, (unsigned long)TIM6->CNT);
+                
                 return 0;
             }
             return -EINVAL;
