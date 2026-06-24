@@ -1,20 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2026 Michael Kaa */
 
-/* Версия модуля: 1.0.1 (обновлён 2026-06-25) */
+/* Версия модуля: 1.0.2 (обновлён 2026-06-25) */
 
 /**
  * @file precise_time.h
- * @version 1.0.1
+ * @version 1.0.2
  * @date    2026-06-25
  * @status  Черновик — не окончательная версия.
  *
  * @brief Высокоточное измерение коротких интервалов времени (~микросекунды).
  *
- * @todo В следующей версии рассмотреть замену runtime-переменной
- *       system_core_clock на SystemCoreClock (CMSIS) или static inline
- *       функцию для снижения накладных расходов при каждом обращении
- *       к макросам PT_MAX_INTERVAL_US / PT_CYCLES_PER_US.
+ * @todo Рассмотреть замену system_core_clock на SystemCoreClock (CMSIS).
  *
  * Описание
  * --------
@@ -76,21 +73,17 @@
 #include <stdint.h>
 #include "stm32f407xx.h"
 
-// TODO: Макросы PT_MAX_INTERVAL_US и PT_CYCLES_PER_US раскрываются при каждом
-//       использовании и читают runtime-переменную system_core_clock, что
-//       добавляет лишние инструкции загрузки памяти. Рассмотреть замену на
-//       SystemCoreClock (CMSIS) или вынос константы в конфигурационный .h
-//       как #define для compile-time вычисления.
 extern uint32_t system_core_clock;
 
-/* ---------- Конфигурация ---------- */
+/* ---------- Внутреннее состояние ---------- */
+
+/** Кэшированный делитель: тиков DWT CYCCNT на одну микросекунду.
+ *  Вычисляется один раз в pt_init() и далее читается без обращения       */
+static uint32_t g_pt_cycles_per_us = 0;
 
 /** Максимальный корректный интервал в микросекундах (~период переполнения).
  *  При 168 МГц: ~25 565 281 мкс ~ 25.57 секунд.                          */
-#define PT_MAX_INTERVAL_US   (0xFFFFFFFFU / (system_core_clock / 1000000U))
-
-/** Делитель циклов -> микросекунды (тиков счётчика на одну микросекунду). */
-#define PT_CYCLES_PER_US     (system_core_clock / 1000000U)
+#define PT_MAX_INTERVAL_US   (0xFFFFFFFFU / g_pt_cycles_per_us)
 
 /* ---------- Публичный API ---------- */
 
@@ -100,6 +93,10 @@ extern uint32_t system_core_clock;
  * Вызвать один раз при старте системы.                             */
 static inline void pt_init(void)
 {
+    /* Кэшировать делитель — однократное вычисление вместо макроса,
+     * раскрывающегося при каждом вызове inline-функции.             */
+    g_pt_cycles_per_us = system_core_clock / 1000000U;
+
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT       = 0;
     DWT->CTRL        |= DWT_CTRL_CYCCNTENA_Msk;
@@ -127,7 +124,7 @@ static inline uint32_t pt_stamp(void)
 static inline uint32_t pt_elapsed_us(uint32_t stamp)
 {
     uint32_t elapsed_cycles = DWT->CYCCNT - stamp;
-    return elapsed_cycles / PT_CYCLES_PER_US;
+    return elapsed_cycles / g_pt_cycles_per_us;
 }
 
 /** @brief Вычислить разницу в микросекундах между двумя метками.
@@ -144,7 +141,7 @@ static inline uint32_t pt_elapsed_us(uint32_t stamp)
 static inline uint32_t pt_diff_us(uint32_t start, uint32_t end)
 {
     uint32_t elapsed_cycles = end - start;
-    return elapsed_cycles / PT_CYCLES_PER_US;
+    return elapsed_cycles / g_pt_cycles_per_us;
 }
 
 /** @brief Блокирующая задержка в микросекундах (busy-wait).
@@ -158,13 +155,13 @@ static inline uint32_t pt_diff_us(uint32_t start, uint32_t end)
  * @note Реальная задержка всегда больше запрошенной из-за накладных
  *       расходов на чтение счётчика и сравнение в каждом витке цикла.
  *       Погрешность составляет десятки тактов.
- * @note При больших значениях us произведение us * PT_CYCLES_PER_US может
+ * @note При больших значениях us произведение us * g_pt_cycles_per_us может
  *       превысить UINT32_MAX, что приведёт к усечению при приведении обратно
  *       к uint32_t и реальной задержке меньше запрошенной.
- *       Максимальный безопасный us ~ 25 565 281 (при 168 МГц),           */
+ *       Максимальный безопасный us ~ 25 565 281 (при 168 МГц).          */
 static inline void pt_delay_us(uint32_t us)
 {
-    uint32_t cycles = (uint32_t)((uint64_t)us * PT_CYCLES_PER_US);
+    uint32_t cycles = (uint32_t)((uint64_t)us * g_pt_cycles_per_us);
     uint32_t start  = DWT->CYCCNT;
     while ((DWT->CYCCNT - start) < cycles)
         /* empty */;
@@ -185,7 +182,7 @@ static inline void pt_delay_us(uint32_t us)
  * @note Результат округляется вниз (целочисленное деление).         */
 static inline uint32_t pt_to_us(uint32_t cycles)
 {
-    return cycles / PT_CYCLES_PER_US;
+    return cycles / g_pt_cycles_per_us;
 }
 
 /** @brief Получить текущее значение счётчика в микросекундах.
