@@ -10,7 +10,6 @@
  * - Получение меток (pt_stamp)
  * - Вычисление прошедшего времени (pt_elapsed_us, pt_diff_us)
  * - Конверсию циклов -> микросекунды (pt_to_us, pt_now_us, pt_now_ms)
- * - Обратную совместимость через micros.h (us_init, micros, millis)
  * - Корректную работу при переполнении 32-битного счётчика (wraparound)
  */
 
@@ -126,24 +125,6 @@ static void test_pt_convenience_functions(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Тест: обратная совместимость через micros.h                         */
-/* ------------------------------------------------------------------ */
-
-static void test_micros_compat_layer(void)
-{
-    /* Включаем макросы из micros.h (обёртки над pt_*).
-     * Для этого нужно определить их вручную, т.к. micros.h
-     * уже инклудит precise_time.h через cmsis_stubs.         */
-
-    pt_init();
-    stubs_advance_cycles(336000U);  /* 2000 мкс = 2 мс */
-
-    /* us_init() -> pt_init() — уже вызван выше, проверяем только маппинг */
-    TEST_ASSERT_EQUAL(2000U, pt_now_us());   /* micros() эквивалент */
-    TEST_ASSERT_EQUAL(2U,    pt_now_ms());   /* millis() эквивалент */
-}
-
-/* ------------------------------------------------------------------ */
 /* Тест: wraparound в pt_elapsed_us                                    */
 /* ------------------------------------------------------------------ */
 
@@ -241,7 +222,6 @@ int main(void)
     RUN_TEST(test_pt_elapsed_us_basic);
     RUN_TEST(test_pt_diff_us_basic);
     RUN_TEST(test_pt_convenience_functions);
-    RUN_TEST(test_micros_compat_layer);
     RUN_TEST(test_pt_elapsed_us_wraparound);
     RUN_TEST(test_pt_diff_us_wraparound);
     RUN_TEST(test_pt_elapsed_sub_microsecond);
