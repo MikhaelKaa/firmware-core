@@ -4,7 +4,7 @@
 
 #include "pwm_led.h"
 #include "stm32f407xx.h"
-#include "micros.h"
+#include "precise_time.h"
 #include <errno.h>
 
 #define PWM_PERIOD           256
@@ -16,7 +16,7 @@ static volatile struct {
     uint8_t    min_bright;
     uint8_t    max_bright;
     uint8_t    current_bright;
-    uint32_t   last_update;         // последний вызов micros()
+    uint32_t   last_stamp;          // последняя метка (pt_stamp(), сырые циклы)
     uint32_t   phase;                // текущая фаза (0 .. period_us-1)
 } led = {
     .mode = LED_MODE_OFF,
@@ -24,7 +24,7 @@ static volatile struct {
     .min_bright = 0,
     .max_bright = 255,
     .current_bright = 0,
-    .last_update = 0,
+    .last_stamp = 0,
     .phase = 0
 };
 
@@ -80,7 +80,7 @@ static void pwm_set_mode(led_mode_t mode, uint16_t period_ms,
     led.period_us = (uint32_t)period_ms * 1000;
     led.min_bright = min_bright;
     led.max_bright = max_bright;
-    led.last_update = micros();
+    led.last_stamp = pt_stamp();
     led.phase = 0;
 
     // Для статических режимов сразу устанавливаем яркость
@@ -98,17 +98,10 @@ static void pwm_set_mode(led_mode_t mode, uint16_t period_ms,
 
 // Периодическая обработка (вызывается из главного цикла)
 static void pwm_proc(void) {
-    uint32_t now = micros();
+    uint32_t dt = pt_elapsed_us(led.last_stamp);
 
-    // Обработка переполнения micros()
-    if (now < led.last_update) {
-        led.last_update = now;
-        return;
-    }
-
-    uint32_t dt = now - led.last_update;
     if (dt < 1000) return;                 // обновление не чаще 1 мс
-    led.last_update = now;
+    led.last_stamp = pt_stamp();
 
     if (led.period_us == 0) return;        // для OFF/ON ничего не делаем
 
@@ -178,7 +171,7 @@ static int pwm_led_ioctl(int cmd, void *arg) {
             pwm_init_hw();
             pwm_set_brightness(0);
             led.mode = LED_MODE_OFF;
-            led.last_update = micros();
+            led.last_stamp = pt_stamp();
             led.phase = 0;
             return 0;
 
