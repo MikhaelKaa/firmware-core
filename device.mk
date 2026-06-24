@@ -25,6 +25,7 @@ C_SOURCES += core/drivers/usb_cdc/usb_desc.c
 C_SOURCES += core/drivers/adc/adc.c
 
 # C includes
+C_INCLUDES += -Icore/lib/time
 C_INCLUDES += -Icore/vendor/CMSIS
 C_INCLUDES += -Icore/kernel
 C_INCLUDES += -Icore/drivers/rcc

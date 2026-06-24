@@ -10,7 +10,7 @@
 #include "ucmd.h"
 #include "rtc.h"
 #include "rtc_time.h"
-#include "micros.h"
+#include "precise_time.h"
 #include "pwm_led.h"
 #include "w25q.h"
 #include "usb_cdc.h"
@@ -33,7 +33,7 @@ int main(void)
     
     printf("%s", logo);
 
-    us_init();
+    pt_init();
 
     drv_face_t* led = dev_pwm_led_get();
     led->ioctl(INTERFACE_INIT, NULL);
@@ -61,7 +61,7 @@ int main(void)
 
     dev_memory_print_info();
     
-    printf("micros: %ld\r\n", micros());
+    printf("micros: %ld\r\n", pt_now_us());
     
     // Установка режима дыхания
     pwm_led_set_mode(led, LED_MODE_BREATHE, 2000, 10, 200);
