@@ -5,7 +5,7 @@
 #   make clean    - удалить артефакты
 
 CC      = gcc
-CFLAGS  = -std=c99 -Wall -Wextra -Wpedantic
+CFLAGS  = -std=c99 -Wall -Wextra -Wpedantic -Werror
 CFLAGS += -g -O0
 CFLAGS += -D_DEFAULT_SOURCE
 
