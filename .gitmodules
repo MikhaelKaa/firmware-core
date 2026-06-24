@@ -1,3 +1,4 @@
 [submodule "tests/unity"]
 	path = tests/unity
 	url = git@github.com:MikhaelKaa/unity.git
+	branch = main
