@@ -1,17 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2026 Michael Kaa */
 
-/* Версия модуля: 1.0.2 (обновлён 2026-06-25) */
+/* Версия модуля: 1.0.4 (обновлен 2026-06-25) */
 
 /**
  * @file precise_time.h
- * @version 1.0.2
+ * @version 1.0.4
  * @date    2026-06-25
  * @status  Черновик — не окончательная версия.
  *
  * @brief Высокоточное измерение коротких интервалов времени (~микросекунды).
- *
- * @todo Рассмотреть замену system_core_clock на SystemCoreClock (CMSIS).
  *
  * Описание
  * --------
@@ -22,11 +20,39 @@
  *   - Блокирующих задержек в микросекундах.
  *   - Вычисления разницы между двумя временными метками.
  *
+ * Архитектура (Исключение)
+ * -----------------------
+ * Данный модуль расположен в core/lib/time, но по исключению разрешается:
+ *   - подключать заголовочные файлы CMSIS/STM32 (stm32f407xx.h),
+ *   - обращаться к аппаратным регистрам Cortex-M (CoreDebug, DWT).
+ * Это обусловлено тем, что DWT CYCCNT — средство отладки архитектуры
+ * ARM Cortex-M, а не специфика конкретного контроллера.
+ *
+ * Частота ядра
+ * ------------
+ * Частота ядра фиксируется на этапе компиляции и НЕ поддерживается для
+ * динамической смены в рантайме. Если частота меняется после вызова
+ * pt_init(), все вычисления будут некорректны.
+ *
+ * Для задания частоты используйте флаг компилятора:
+ *     -DSYSTEM_CORE_CLOCK=168000000U
+ *
+ * При отсутствии макроса используется обратная совместимость через
+ * внешнюю переменную system_core_clock (fallback).
+ *
+ * Делитель (циклов на микросекунду) вычисляется как compile-time константа
+ * и подставляется в каждый inline-вызов. Это гарантирует одинаковое
+ * поведение кода при любом уровне оптимизации (-Og, -O2, -Os).
+ *
+ * Compile-time проверка согласованности макроса SYSTEM_CORE_CLOCK и
+ * runtime-переменной system_core_clock (если она определена) находится
+ * в rcc.c (_Static_assert).
+ *
  * Ограничения (Важно!)
  * --------------------
  * Счётчик DWT->CYCCNT является 32-битным, поэтому переполняется каждые:
  *
- *     период = 2^32 / system_core_clock
+ *     период = 2^32 / SYSTEM_CORE_CLOCK
  *           ~ 4 294 967 296 / 168 000 000 ~ 25.57 секунд (при 168 МГц)
  *
  * Это накладывает жёсткие ограничения:
@@ -64,7 +90,8 @@
  *     uint32_t t_end   = pt_stamp();
  *     uint32_t diff = pt_diff_us(t_start, t_end);
  *
- * @note Точность зависит от system_core_clock. При 168 МГц — ~6 нс на тик. Плюс некоторые накладные расходы.
+ * @note Точность зависит от SYSTEM_CORE_CLOCK. При 168 МГц — ~6 нс на тик.
+ *       Плюс некоторые накладные расходы.
  */
 
 #ifndef PRECISE_TIME_H
@@ -73,17 +100,20 @@
 #include <stdint.h>
 #include "stm32f407xx.h"
 
-extern uint32_t system_core_clock;
+/* ---------- Частота ядра (compile-time или fallback) ---------- */
 
-/* ---------- Внутреннее состояние ---------- */
+#ifndef SYSTEM_CORE_CLOCK
+  extern uint32_t system_core_clock;
+  #define SYSTEM_CORE_CLOCK system_core_clock
+#endif
 
-/** Кэшированный делитель: тиков DWT CYCCNT на одну микросекунду.
- *  Вычисляется один раз в pt_init() и далее читается без обращения       */
-static uint32_t g_pt_cycles_per_us = 0;
+/** Compile-time константа: тиков DWT CYCCNT на одну микросекунду.
+ *  Гарантирует одинаковую оптимизацию при любом уровне -O.             */
+#define PT_CYCLES_PER_US   (SYSTEM_CORE_CLOCK / 1000000U)
 
 /** Максимальный корректный интервал в микросекундах (~период переполнения).
  *  При 168 МГц: ~25 565 281 мкс ~ 25.57 секунд.                          */
-#define PT_MAX_INTERVAL_US   (0xFFFFFFFFU / g_pt_cycles_per_us)
+#define PT_MAX_INTERVAL_US   (0xFFFFFFFFU / PT_CYCLES_PER_US)
 
 /* ---------- Публичный API ---------- */
 
@@ -93,10 +123,6 @@ static uint32_t g_pt_cycles_per_us = 0;
  * Вызвать один раз при старте системы.                             */
 static inline void pt_init(void)
 {
-    /* Кэшировать делитель — однократное вычисление вместо макроса,
-     * раскрывающегося при каждом вызове inline-функции.             */
-    g_pt_cycles_per_us = system_core_clock / 1000000U;
-
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT       = 0;
     DWT->CTRL        |= DWT_CTRL_CYCCNTENA_Msk;
@@ -124,7 +150,7 @@ static inline uint32_t pt_stamp(void)
 static inline uint32_t pt_elapsed_us(uint32_t stamp)
 {
     uint32_t elapsed_cycles = DWT->CYCCNT - stamp;
-    return elapsed_cycles / g_pt_cycles_per_us;
+    return elapsed_cycles / PT_CYCLES_PER_US;
 }
 
 /** @brief Вычислить разницу в микросекундах между двумя метками.
@@ -141,7 +167,7 @@ static inline uint32_t pt_elapsed_us(uint32_t stamp)
 static inline uint32_t pt_diff_us(uint32_t start, uint32_t end)
 {
     uint32_t elapsed_cycles = end - start;
-    return elapsed_cycles / g_pt_cycles_per_us;
+    return elapsed_cycles / PT_CYCLES_PER_US;
 }
 
 /** @brief Блокирующая задержка в микросекундах (busy-wait).
@@ -155,13 +181,13 @@ static inline uint32_t pt_diff_us(uint32_t start, uint32_t end)
  * @note Реальная задержка всегда больше запрошенной из-за накладных
  *       расходов на чтение счётчика и сравнение в каждом витке цикла.
  *       Погрешность составляет десятки тактов.
- * @note При больших значениях us произведение us * g_pt_cycles_per_us может
+ * @note При больших значениях us произведение us * PT_CYCLES_PER_US может
  *       превысить UINT32_MAX, что приведёт к усечению при приведении обратно
  *       к uint32_t и реальной задержке меньше запрошенной.
  *       Максимальный безопасный us ~ 25 565 281 (при 168 МГц).          */
 static inline void pt_delay_us(uint32_t us)
 {
-    uint32_t cycles = (uint32_t)((uint64_t)us * g_pt_cycles_per_us);
+    uint32_t cycles = (uint32_t)((uint64_t)us * PT_CYCLES_PER_US);
     uint32_t start  = DWT->CYCCNT;
     while ((DWT->CYCCNT - start) < cycles)
         /* empty */;
@@ -182,7 +208,7 @@ static inline void pt_delay_us(uint32_t us)
  * @note Результат округляется вниз (целочисленное деление).         */
 static inline uint32_t pt_to_us(uint32_t cycles)
 {
-    return cycles / g_pt_cycles_per_us;
+    return cycles / PT_CYCLES_PER_US;
 }
 
 /** @brief Получить текущее значение счётчика в микросекундах.

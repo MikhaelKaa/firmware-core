@@ -5,7 +5,27 @@
 
 #include "stm32f407xx.h"
 
+/* ------------------------------------------------------------------ */
+/* Частота ядра                                                       */
+/* ------------------------------------------------------------------ */
+
+/** Фактическая частота процессора (Гц).
+ *  Должна совпадать с SYSTEM_CORE_CLOCK из precise_time.h.              */
 const uint32_t system_core_clock = 168000000;
+
+/* Compile-time проверки макроса SYSTEM_CORE_CLOCK (если задан через -D) */
+
+/* Макрос должен быть положительным числом                              */
+_Static_assert(SYSTEM_CORE_CLOCK > 0,
+    "SYSTEM_CORE_CLOCK must be a positive constant");
+
+/* Должно делиться на 1 МГц без остатка (иначе потеря точности          */
+/* при вычислении PT_CYCLES_PER_US в precise_time.h)                   */
+_Static_assert((SYSTEM_CORE_CLOCK % 1000000U) == 0,
+    "SYSTEM_CORE_CLOCK must be divisible by 1 000 000");
+
+/* Согласованность compile-time макроса и runtime-переменной           */
+/* (проверяется в SystemInit() через hardware_panic при расхождении)    */
 
 void SystemInit(void)
 {
