@@ -91,6 +91,6 @@ int main(void)
         ucmd_default_proc();
         led_proc();
         printf_flush();  // Flush printf buffer asynchronously
-        for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
+        // for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
     }
 }
