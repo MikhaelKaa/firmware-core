@@ -23,6 +23,7 @@ C_SOURCES += core/drivers/w25q/w25q.c
 C_SOURCES += core/drivers/usb_cdc/usb_cdc.c
 C_SOURCES += core/drivers/usb_cdc/usb_desc.c
 C_SOURCES += core/drivers/adc/adc.c
+C_SOURCES += core/drivers/reset/reset.c
 
 # C includes
 C_INCLUDES += -Icore/lib/time
@@ -37,6 +38,7 @@ C_INCLUDES += -Icore/drivers/led
 C_INCLUDES += -Icore/drivers/w25q
 C_INCLUDES += -Icore/drivers/usb_cdc
 C_INCLUDES += -Icore/drivers/adc
+C_INCLUDES += -Icore/drivers/reset
 
 # ASM sources
 ASM_SOURCES +=  core/vendor/startup/startup_stm32f407xx.s

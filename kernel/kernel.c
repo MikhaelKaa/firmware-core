@@ -7,7 +7,7 @@
 #include "drv_face.h"
 #include "svccalls.h"
 #include "mem.h"
-#include "ucmd.h"
+#include "cli_setup.h"
 #include "rtc.h"
 #include "rtc_time.h"
 #include "precise_time.h"
@@ -81,15 +81,37 @@ int main(void)
     adc1->ioctl(INTERFACE_GET_INFO, &adc_ver);
     printf("ADC1 initialized: %s\r\n", adc_ver);
 
-    ucmd_default_init();
+    /* ---------------------------------------------------------- */
+    /* CLI initialization (Round 2 — instance-based API)           */
+    /* ---------------------------------------------------------- */
+
+    /* Static memory for the CLI instance (no malloc) */
+    static uint8_t g_cli_mem[CLI_INSTANCE_SIZE] __attribute__((aligned(4)));
+
+    /* Build configuration: get base config and override iface */
+    const cli_config_t *base_cfg = cli_setup_get_config();
+    cli_config_t cli_cfg = *base_cfg;
+    cli_cfg.iface = &dev_uart1;
+
+    /* Create the CLI instance */
+    cli_t *g_cli = cli_create(&cli_cfg, g_cli_mem, sizeof(g_cli_mem));
+
+    /* Show initial prompt */
+    extern void cli_show_prompt(cli_t *);
+    if (g_cli != NULL) {
+        cli_show_prompt(g_cli);
+    }
 
     // Declare printf_flush
     extern void printf_flush(void);
 
     while (1)
     {
-        ucmd_default_proc();
+        if (g_cli != NULL) {
+            cli_proc(g_cli);
+        }
         led_proc();
+        // TODO: удалить после перехода на drv_face_t->write() (Раунд 2)
         printf_flush();  // Flush printf buffer asynchronously
         // for(volatile unsigned int i = 0; i < 1234U; i++) asm("nop");
     }
